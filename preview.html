@@ -130,6 +130,7 @@
         gap: 24px;
         grid-template-columns: 1.08fr .92fr;
       }
+      .hero-column { display: grid; align-content: start; gap: 24px; }
       .hero {
         min-height: 570px;
         position: relative;
@@ -473,6 +474,7 @@
         grid-template-columns: 1fr 1fr;
         gap: 18px;
       }
+      #regional-map { grid-column: 1 / -1; }
       .overview {
         max-width: 1180px;
         margin: 26px auto;
@@ -630,6 +632,18 @@
         padding: 12px;
         font-weight: 700;
       }
+      .scanner-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+      .refresh-scan {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        background: var(--cream);
+        color: var(--burgundy);
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .refresh-scan:disabled { cursor: not-allowed; opacity: .4; }
+      #recognition-details { display: grid; gap: 8px; }
       .scan-purpose {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -757,6 +771,22 @@
       }
       .modal.delete-mode .modal-actions { grid-template-columns: 1fr 1fr; }
       .modal.delete-mode .modal-cancel { display: block; }
+      .profile-settings {
+        max-width: 1180px;
+        margin: 28px auto;
+        border-top: 1px solid rgba(142,96,72,.2);
+        padding: 28px 0 12px;
+      }
+      .profile-form { display: grid; grid-template-columns: minmax(180px, 320px) auto; gap: 8px; margin-top: 16px; }
+      .profile-form input {
+        border: 1px solid rgba(142,96,72,.25);
+        border-radius: 6px;
+        background: white;
+        padding: 12px;
+        font: inherit;
+      }
+      .profile-form button { border-radius: 6px; background: var(--burgundy); color: white; padding: 12px 16px; font-weight: 800; }
+      .profile-status { min-height: 18px; color: var(--oak); font-size: 13px; }
       .shelves {
         position: absolute;
         top: 122px;
@@ -803,6 +833,7 @@
         .recognition, .capture-grid { grid-template-columns: 1fr; }
         .overview-head { align-items: start; flex-direction: column; }
         .collection-tools, .collection-grid { grid-template-columns: 1fr; }
+        .profile-form { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -823,12 +854,14 @@
               <a href="#dashboard">Overall Collection</a>
               <a href="#regional-map">Regional Map</a>
               <a href="#sommelier">AI Sommelier</a>
+              <a href="#settings">Profile & Settings</a>
             </nav>
           </details>
         </div>
       </header>
 
       <div class="grid">
+        <div class="hero-column">
         <section class="hero">
           <div class="shelves left">
             <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -841,7 +874,7 @@
             <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
           </div>
           <span class="pill">Entering the west cellar</span>
-          <h1 class="serif">Step inside your private collection.</h1>
+          <h1 class="serif">Welcome back, <span id="welcome-name">First_Name</span>.</h1>
           <p>Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which vintage deserves the table tonight.</p>
           <div class="bottle"><div class="label"><small>Grand Cru</small><b>Cellar</b><p>AI Selected</p><b>2018</b></div></div>
           <div class="stats">
@@ -851,6 +884,7 @@
             <div class="stat"><strong id="stat-regions">0</strong><span>Regions</span></div>
           </div>
         </section>
+        </div>
 
         <aside class="side">
           <section class="panel">
@@ -922,8 +956,10 @@
 
       <section class="wide" id="dashboard">
         <div class="panel" id="add-bottle">
-          <p class="eyebrow">Add Bottle</p>
-          <h2>AI Bottle Recognition</h2>
+          <div class="scanner-heading">
+            <div><p class="eyebrow">Add Bottle</p><h2>AI Bottle Recognition</h2></div>
+            <button class="refresh-scan" id="refresh-identification" aria-label="Refresh wine identification" title="Refresh identification" disabled>↻</button>
+          </div>
           <div class="scan-purpose" aria-label="Bottle scan purpose">
             <button class="scan-choice active" data-intent="collection" aria-pressed="true">Add to my collection</button>
             <button class="scan-choice" data-intent="checking" aria-pressed="false">Just checking</button>
@@ -952,16 +988,7 @@
             </div>
             <div class="rows">
               <div class="recognition-status" id="recognition-status">Upload or take a photo to identify the bottle</div>
-              <div class="row"><span>Producer</span><strong>Domaine Leflaive</strong></div>
-              <div class="row"><span>Wine</span><strong>Puligny-Montrachet Les Pucelles</strong></div>
-              <div class="row"><span>Vintage</span><strong>2020</strong></div>
-              <div class="row"><span>Region</span><strong>Burgundy, France</strong></div>
-              <div class="row"><span>Appellation</span><strong>Puligny-Montrachet Premier Cru</strong></div>
-              <div class="row"><span>Grapes</span><strong>100% Chardonnay</strong></div>
-              <div class="row"><span>Classification</span><strong>Premier Cru</strong></div>
-              <div class="row"><span>Drinking window</span><strong>2027-2042</strong></div>
-              <div class="row"><span>Serving</span><strong>12 C / no decant</strong></div>
-              <div class="row"><span>Tasting notes</span><strong>White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. Layered, satin-textured, and mineral.</strong></div>
+              <div id="recognition-details"></div>
               <button class="identify-action" id="identify-action" disabled>Identify and add bottle</button>
             </div>
           </div>
@@ -1018,6 +1045,15 @@
         <p class="collection-count" id="collection-count"></p>
         <div class="collection-grid" id="collection-grid"></div>
       </section>
+      <section class="profile-settings" id="settings">
+        <p class="eyebrow">Profile & Settings</p>
+        <h2>Your Cellar profile</h2>
+        <form class="profile-form" id="profile-form">
+          <input id="profile-first-name" type="text" placeholder="First name" autocomplete="given-name" aria-label="First name" />
+          <button type="submit">Save profile</button>
+        </form>
+        <p class="profile-status" id="profile-status" role="status"></p>
+      </section>
     </main>
     <div class="modal" id="action-modal" aria-hidden="true">
       <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -1033,6 +1069,7 @@
       </section>
     </div>
     <script>
+      document.querySelector(".hero-column").appendChild(document.getElementById("add-bottle"));
       const dropzone = document.getElementById("bottle-dropzone");
       const uploadInput = document.getElementById("bottle-upload");
       const cameraInput = document.getElementById("bottle-camera");
@@ -1042,27 +1079,62 @@
       const recognitionStatus = document.getElementById("recognition-status");
       const scanChoices = document.querySelectorAll(".scan-choice");
       const identifyAction = document.getElementById("identify-action");
+      const refreshIdentification = document.getElementById("refresh-identification");
+      const recognitionDetails = document.getElementById("recognition-details");
       let bottleIntent = "collection";
       let bottlePhotoReady = false;
-      const researchedBottle = {
-        producer: "Domaine Leflaive",
-        wine: "Puligny-Montrachet 1er Cru Les Pucelles",
-        vintage: "2020",
-        region: "Burgundy, France",
-        appellation: "Puligny-Montrachet Premier Cru",
-        classification: "Premier Cru",
-        grapes: "100% Chardonnay",
-        score: 96,
-        maturity: "Approaching peak",
-        window: "2027-2042",
-        quantity: "1 bottle",
-        storage: "Location not set",
-        service: "12 C / no decant",
-        purchase: "Not added",
-        market: "Researching",
-        color: "linear-gradient(135deg,#a48b55,#596659)",
-        note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. The palate is layered and satin-textured, finishing with precise mineral freshness."
-      };
+      let currentResearchIndex = -1;
+      const researchedWines = [
+        {
+          producer: "Domaine Leflaive", wine: "Puligny-Montrachet 1er Cru Les Pucelles", vintage: "2020",
+          region: "Burgundy, France", appellation: "Puligny-Montrachet Premier Cru", classification: "Premier Cru",
+          grapes: "100% Chardonnay", score: 96, maturity: "Approaching peak", window: "2027-2042",
+          quantity: "1 bottle", storage: "Location not set", service: "12 C / no decant", purchase: "Not added",
+          market: "Researching", color: "linear-gradient(135deg,#a48b55,#596659)",
+          note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. Layered, satin-textured, and mineral."
+        },
+        {
+          producer: "Ridge Vineyards", wine: "Monte Bello Cabernet Sauvignon", vintage: "2019",
+          region: "Santa Cruz Mountains, USA", appellation: "Santa Cruz Mountains", classification: "Estate wine",
+          grapes: "Cabernet Sauvignon blend", score: 96, maturity: "Needs aging", window: "2032-2065",
+          quantity: "1 bottle", storage: "Location not set", service: "17 C / 90 min decant", purchase: "Not added",
+          market: "Researching", color: "linear-gradient(135deg,#637456,#4e5b5b)",
+          note: "Mountain cassis, mint, crushed stone, cedar, and savory herbs framed by fresh acidity and firm tannins."
+        },
+        {
+          producer: "Giacomo Conterno", wine: "Barolo Monfortino Riserva", vintage: "2013",
+          region: "Piedmont, Italy", appellation: "Barolo DOCG", classification: "Riserva",
+          grapes: "100% Nebbiolo", score: 99, maturity: "Entering peak", window: "2026-2055",
+          quantity: "1 bottle", storage: "Location not set", service: "18 C / 180 min decant", purchase: "Not added",
+          market: "Researching", color: "linear-gradient(135deg,#7a2832,#34211d)",
+          note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity."
+        }
+      ];
+
+      function currentResearchedWine() {
+        return researchedWines[Math.max(currentResearchIndex, 0)];
+      }
+
+      function renderRecognition() {
+        if (currentResearchIndex < 0) {
+          recognitionDetails.innerHTML = '<div class="row"><span>Identification</span><strong>Awaiting photo</strong></div>';
+          return;
+        }
+        const wine = currentResearchedWine();
+        const details = [
+          ["Producer", wine.producer], ["Wine", wine.wine], ["Vintage", wine.vintage], ["Region", wine.region],
+          ["Appellation", wine.appellation], ["Grapes", wine.grapes], ["Classification", wine.classification],
+          ["Drinking window", wine.window], ["Serving", wine.service], ["Tasting notes", wine.note]
+        ];
+        recognitionDetails.innerHTML = details.map(([label, value]) => `<div class="row"><span>${label}</span><strong>${value}</strong></div>`).join("");
+      }
+
+      function refreshWineIdentification() {
+        if (!bottlePhotoReady) return;
+        currentResearchIndex = (currentResearchIndex + 1) % researchedWines.length;
+        renderRecognition();
+        recognitionStatus.textContent = `Updated match: ${currentResearchedWine().vintage} ${currentResearchedWine().producer}`;
+      }
 
       function updateBottleIntent() {
         scanChoices.forEach((choice) => {
@@ -1081,11 +1153,16 @@
       function handleBottleFile(file) {
         if (!file) return;
         bottlePhotoReady = true;
+        const fileLabel = file.name.toLowerCase();
+        const matchedIndex = researchedWines.findIndex((wine) => fileLabel.includes(wine.producer.split(" ")[0].toLowerCase()) || fileLabel.includes(wine.wine.split(" ")[0].toLowerCase()));
+        currentResearchIndex = matchedIndex >= 0 ? matchedIndex : (currentResearchIndex + 1) % researchedWines.length;
         fileName.textContent = file.name;
         previewImage.src = URL.createObjectURL(file);
         previewImage.style.display = "block";
         emptyPhoto.style.display = "none";
         identifyAction.disabled = false;
+        refreshIdentification.disabled = false;
+        renderRecognition();
         updateBottleIntent();
       }
 
@@ -1098,6 +1175,7 @@
       identifyAction.addEventListener("click", () => {
         if (!bottlePhotoReady) return;
         if (bottleIntent === "collection") saveResearchedBottle();
+        const researchedBottle = currentResearchedWine();
         openActionModal(
           bottleIntent === "collection" ? "Bottle added to your collection" : "Wine identified, not saved",
           bottleIntent === "collection"
@@ -1105,9 +1183,16 @@
             : `${researchedBottle.note} This research was not saved to your collection.`
         );
       });
+      refreshIdentification.addEventListener("click", refreshWineIdentification);
 
-      uploadInput.addEventListener("change", () => handleBottleFile(uploadInput.files[0]));
-      cameraInput.addEventListener("change", () => handleBottleFile(cameraInput.files[0]));
+      uploadInput.addEventListener("change", () => {
+        handleBottleFile(uploadInput.files[0]);
+        uploadInput.value = "";
+      });
+      cameraInput.addEventListener("change", () => {
+        handleBottleFile(cameraInput.files[0]);
+        cameraInput.value = "";
+      });
       dropzone.addEventListener("dragover", (event) => {
         event.preventDefault();
         dropzone.classList.add("dragging");
@@ -1118,6 +1203,7 @@
         dropzone.classList.remove("dragging");
         handleBottleFile(event.dataTransfer.files[0]);
       });
+      renderRecognition();
 
       const locationQuery = document.getElementById("location-query");
       const searchLocationButton = document.getElementById("search-location");
@@ -1261,6 +1347,7 @@
       }
 
       function saveResearchedBottle() {
+        const researchedBottle = currentResearchedWine();
         const key = `${researchedBottle.producer}-${researchedBottle.vintage}`;
         const existing = collectionBottles.findIndex((wine) => `${wine.producer}-${wine.vintage}` === key);
         if (existing >= 0) {
@@ -1446,6 +1533,27 @@
         collectionRegion.value = selectedMapRegion;
         renderCollection();
         document.getElementById("my-collection").scrollIntoView({ behavior: "smooth" });
+      });
+
+      const profileForm = document.getElementById("profile-form");
+      const profileFirstName = document.getElementById("profile-first-name");
+      const profileStatus = document.getElementById("profile-status");
+      const welcomeName = document.getElementById("welcome-name");
+      const savedFirstName = localStorage.getItem("cellar-profile-first-name") || "";
+      if (savedFirstName) {
+        profileFirstName.value = savedFirstName;
+        welcomeName.textContent = savedFirstName;
+      }
+      profileForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const firstName = profileFirstName.value.trim();
+        if (!firstName) {
+          profileStatus.textContent = "Enter your first name.";
+          return;
+        }
+        localStorage.setItem("cellar-profile-first-name", firstName);
+        welcomeName.textContent = firstName;
+        profileStatus.textContent = "Profile saved.";
       });
 
       const actionModal = document.getElementById("action-modal");

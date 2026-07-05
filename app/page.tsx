@@ -20,6 +20,7 @@ import {
   ScanLine,
   Search,
   Send,
+  Settings,
   ShieldCheck,
   Sparkles,
   ThermometerSun,
@@ -27,10 +28,12 @@ import {
   Upload,
   Utensils,
   Wine,
+  RefreshCw,
   X
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type CollectionBottle = {
   producer: string;
@@ -52,25 +55,32 @@ type CollectionBottle = {
   accent: string;
 };
 
-const researchedBottle: CollectionBottle = {
-  producer: "Domaine Leflaive",
-  wine: "Puligny-Montrachet 1er Cru Les Pucelles",
-  vintage: "2020",
-  region: "Burgundy, France",
-  appellation: "Puligny-Montrachet Premier Cru",
-  grapes: "100% Chardonnay",
-  classification: "Premier Cru",
-  cellar: "Location not set",
-  score: "96",
-  window: "Approaching peak",
-  drinkingWindow: "2027-2042",
-  quantity: "1 bottle",
-  purchase: "Not added",
-  market: "Researching",
-  service: "12 C / no decant",
-  note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. The palate is layered and satin-textured, finishing with precise mineral freshness.",
-  accent: "from-[#a48b55] to-[#596659]"
-};
+const researchedWines: CollectionBottle[] = [
+  {
+    producer: "Domaine Leflaive", wine: "Puligny-Montrachet 1er Cru Les Pucelles", vintage: "2020",
+    region: "Burgundy, France", appellation: "Puligny-Montrachet Premier Cru", grapes: "100% Chardonnay",
+    classification: "Premier Cru", cellar: "Location not set", score: "96", window: "Approaching peak",
+    drinkingWindow: "2027-2042", quantity: "1 bottle", purchase: "Not added", market: "Researching",
+    service: "12 C / no decant", note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. Layered, satin-textured, and mineral.",
+    accent: "from-[#a48b55] to-[#596659]"
+  },
+  {
+    producer: "Ridge Vineyards", wine: "Monte Bello Cabernet Sauvignon", vintage: "2019",
+    region: "Santa Cruz Mountains, USA", appellation: "Santa Cruz Mountains", grapes: "Cabernet Sauvignon blend",
+    classification: "Estate wine", cellar: "Location not set", score: "96", window: "Needs aging",
+    drinkingWindow: "2032-2065", quantity: "1 bottle", purchase: "Not added", market: "Researching",
+    service: "17 C / 90 min decant", note: "Mountain cassis, mint, crushed stone, cedar, and savory herbs framed by fresh acidity and firm tannins.",
+    accent: "from-cellar-moss to-cellar-slate"
+  },
+  {
+    producer: "Giacomo Conterno", wine: "Barolo Monfortino Riserva", vintage: "2013",
+    region: "Piedmont, Italy", appellation: "Barolo DOCG", grapes: "100% Nebbiolo",
+    classification: "Riserva", cellar: "Location not set", score: "99", window: "Entering peak",
+    drinkingWindow: "2026-2055", quantity: "1 bottle", purchase: "Not added", market: "Researching",
+    service: "18 C / 180 min decant", note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity.",
+    accent: "from-[#7a2832] to-[#34211d]"
+  }
+];
 
 const vintages = [
   ["2015", "97", "Peak", "Rack A"],
@@ -149,6 +159,7 @@ export default function Home() {
   const [bottleImageName, setBottleImageName] = useState("No bottle photo selected");
   const [bottleImagePreview, setBottleImagePreview] = useState("");
   const [bottleIntent, setBottleIntent] = useState<"collection" | "checking">("collection");
+  const [researchIndex, setResearchIndex] = useState(-1);
   const [activeDialog, setActiveDialog] = useState<{ title: string; body: string; confirmLabel?: string; onConfirm?: () => void } | null>(null);
   const [favoriteBottles, setFavoriteBottles] = useState<string[]>([]);
   const [collectionBottles, setCollectionBottles] = useState<CollectionBottle[]>([]);
@@ -161,6 +172,11 @@ export default function Home() {
   const [sommelierMessages, setSommelierMessages] = useState<Array<{ role: "assistant" | "user"; text: string }>>([
     { role: "assistant", text: "Good evening. What are you cooking, or what would you like to open?" }
   ]);
+  const [firstName, setFirstName] = useState("First_Name");
+  const [profileFirstName, setProfileFirstName] = useState("");
+  const [profileStatus, setProfileStatus] = useState("");
+  const [scannerTarget, setScannerTarget] = useState<HTMLElement | null>(null);
+  const researchedBottle = researchedWines[Math.max(researchIndex, 0)];
   const tonight = liveTonight ?? {
     label: "",
     weather: "Location not set"
@@ -193,11 +209,17 @@ export default function Home() {
     : "-";
 
   useEffect(() => {
+    setScannerTarget(document.getElementById("hero-scanner-slot"));
     try {
       localStorage.removeItem("cellar-removed-bottles");
       localStorage.removeItem("cellar-collection-bottles");
       const saved = JSON.parse(localStorage.getItem("cellar-collection-bottles-v2") ?? "[]");
       if (Array.isArray(saved)) setCollectionBottles(saved);
+      const savedFirstName = localStorage.getItem("cellar-profile-first-name") ?? "";
+      if (savedFirstName) {
+        setFirstName(savedFirstName);
+        setProfileFirstName(savedFirstName);
+      }
     } catch {
       setCollectionBottles([]);
     }
@@ -205,8 +227,30 @@ export default function Home() {
 
   function handleBottleImage(file?: File) {
     if (!file) return;
+    const fileLabel = file.name.toLowerCase();
+    const matchedIndex = researchedWines.findIndex((wine) =>
+      fileLabel.includes(wine.producer.split(" ")[0].toLowerCase()) ||
+      fileLabel.includes(wine.wine.split(" ")[0].toLowerCase())
+    );
+    setResearchIndex((current) => matchedIndex >= 0 ? matchedIndex : (current + 1) % researchedWines.length);
     setBottleImageName(file.name);
     setBottleImagePreview(URL.createObjectURL(file));
+  }
+
+  function refreshIdentification() {
+    if (!bottleImagePreview) return;
+    setResearchIndex((current) => (current + 1) % researchedWines.length);
+  }
+
+  function saveProfile() {
+    const value = profileFirstName.trim();
+    if (!value) {
+      setProfileStatus("Enter your first name.");
+      return;
+    }
+    localStorage.setItem("cellar-profile-first-name", value);
+    setFirstName(value);
+    setProfileStatus("Profile saved.");
   }
 
   async function loadWeather(latitude: number, longitude: number, label: string) {
@@ -376,7 +420,8 @@ export default function Home() {
                   ["Full Collection Overview", "#collection-overview", Wine],
                   ["Overall Collection", "#dashboard", LayoutDashboard],
                   ["Regional Map", "#regional-map", Map],
-                  ["AI Sommelier", "#sommelier", MessageCircle]
+                  ["AI Sommelier", "#sommelier", MessageCircle],
+                  ["Profile & Settings", "#settings", Settings]
                 ].map(([label, href, Icon]) => {
                   const NavIcon = Icon as typeof Wine;
                   return (
@@ -397,6 +442,7 @@ export default function Home() {
         </header>
 
         <div className="mx-auto grid max-w-7xl gap-6 pt-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
+          <div className="grid content-start gap-6">
           <section className="relative overflow-hidden rounded-lg bg-cellar-night p-5 text-cellar-cream shadow-cellar sm:p-7">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(199,162,90,0.24),transparent_24%),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px)] [background-size:auto,44px_44px,44px_44px]" />
             <div className="absolute inset-x-8 bottom-0 top-24 rounded-t-full border border-cellar-gold/18 bg-[linear-gradient(90deg,rgba(75,48,41,.42),rgba(23,18,17,.16),rgba(75,48,41,.42))]" />
@@ -415,7 +461,7 @@ export default function Home() {
                     Entering the west cellar
                   </div>
                   <h1 className="max-w-2xl font-serif text-5xl leading-[0.95] tracking-normal text-white sm:text-7xl">
-                    Step inside your private collection.
+                    Welcome back, {firstName}.
                   </h1>
                   <p className="mt-5 max-w-xl text-base leading-7 text-cellar-cream/76 sm:text-lg">
                     Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which
@@ -438,6 +484,8 @@ export default function Home() {
               </div>
             </div>
           </section>
+            <div id="hero-scanner-slot" />
+          </div>
 
           <aside className="grid gap-6">
             <section className="rounded-lg border border-white/70 bg-cellar-parchment/82 p-5 shadow-soft backdrop-blur" id="cellar">
@@ -616,8 +664,20 @@ export default function Home() {
       </section>
 
       <section className="bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="mx-auto max-w-7xl">
+          {scannerTarget && createPortal(
           <Panel title="AI Bottle Recognition" eyebrow="Add Bottle" icon={<ScanLine className="size-5" />} id="add-bottle">
+            <div className="-mt-16 mb-5 flex justify-end">
+              <button
+                className="grid size-9 place-items-center rounded-md bg-cellar-cream text-burgundy-700 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Refresh wine identification"
+                title="Refresh identification"
+                disabled={!bottleImagePreview}
+                onClick={refreshIdentification}
+              >
+                <RefreshCw className="size-4" aria-hidden />
+              </button>
+            </div>
             <div className="mb-4 grid grid-cols-2 rounded-md bg-cellar-cream p-1" aria-label="Bottle scan purpose">
               <button
                 className={`rounded-md px-3 py-3 text-sm font-medium transition ${bottleIntent === "collection" ? "bg-burgundy-700 text-white shadow-soft" : "text-cellar-walnut"}`}
@@ -666,7 +726,10 @@ export default function Home() {
                       className="sr-only"
                       type="file"
                       accept="image/*"
-                      onChange={(event) => handleBottleImage(event.target.files?.[0])}
+                      onChange={(event) => {
+                        handleBottleImage(event.target.files?.[0]);
+                        event.currentTarget.value = "";
+                      }}
                     />
                   </label>
                   <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-cellar-ink px-3 py-3 text-sm font-medium text-white">
@@ -677,7 +740,10 @@ export default function Home() {
                       type="file"
                       accept="image/*"
                       capture="environment"
-                      onChange={(event) => handleBottleImage(event.target.files?.[0])}
+                      onChange={(event) => {
+                        handleBottleImage(event.target.files?.[0]);
+                        event.currentTarget.value = "";
+                      }}
                     />
                   </label>
                 </div>
@@ -689,7 +755,7 @@ export default function Home() {
                     ? bottleIntent === "collection" ? "Ready to identify and add to your collection" : "Ready to identify without saving"
                     : "Upload or take a photo to identify the bottle"}
                 </div>
-                {[
+                {(researchIndex < 0 ? [["Identification", "Awaiting photo"]] : [
                   ["Producer", researchedBottle.producer],
                   ["Wine", researchedBottle.wine],
                   ["Vintage", researchedBottle.vintage],
@@ -700,7 +766,7 @@ export default function Home() {
                   ["Drinking window", researchedBottle.drinkingWindow],
                   ["Serving", researchedBottle.service],
                   ["Tasting notes", researchedBottle.note]
-                ].map(([label, value]) => (
+                ]).map(([label, value]) => (
                   <div className="flex items-center justify-between rounded-md bg-white/78 px-4 py-3" key={label}>
                     <span className="text-sm text-cellar-walnut">{label}</span>
                     <span className="text-right font-medium">{value}</span>
@@ -723,7 +789,8 @@ export default function Home() {
                 </button>
               </div>
             </div>
-          </Panel>
+          </Panel>,
+          scannerTarget)}
 
           <Panel title="Collection Dashboard" eyebrow="Live cellar" icon={<BarChart3 className="size-5" />} id="dashboard">
             <div className="grid gap-3 sm:grid-cols-3">
@@ -950,6 +1017,31 @@ export default function Home() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className="border-t border-cellar-oak/20 bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8" id="settings">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Profile & Settings</p>
+          <h2 className="mt-2 font-serif text-4xl">Your Cellar profile</h2>
+          <form
+            className="mt-5 grid max-w-lg gap-2 sm:grid-cols-[1fr_auto]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveProfile();
+            }}
+          >
+            <input
+              className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+              value={profileFirstName}
+              onChange={(event) => setProfileFirstName(event.target.value)}
+              placeholder="First name"
+              autoComplete="given-name"
+              aria-label="First name"
+            />
+            <button className="rounded-md bg-burgundy-700 px-5 py-3 text-sm font-medium text-white" type="submit">Save profile</button>
+          </form>
+          <p className="mt-2 min-h-5 text-sm text-cellar-walnut" role="status">{profileStatus}</p>
         </div>
       </section>
 
