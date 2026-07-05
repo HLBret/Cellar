@@ -29,131 +29,47 @@ import {
   X
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const cellarStats = [
-  ["742", "Bottles"],
-  ["96", "Ready now"],
-  ["214", "Resting"],
-  ["14", "Regions"]
-];
+type CollectionBottle = {
+  producer: string;
+  wine: string;
+  vintage: string;
+  region: string;
+  appellation: string;
+  grapes: string;
+  classification: string;
+  cellar: string;
+  score: string;
+  window: string;
+  drinkingWindow: string;
+  quantity: string;
+  purchase: string;
+  market: string;
+  service: string;
+  note: string;
+  accent: string;
+};
 
-const bottles = [
-  {
-    producer: "Domaine Armand Rousseau",
-    wine: "Gevrey-Chambertin Clos Saint-Jacques",
-    vintage: "2018",
-    region: "Burgundy, France",
-    appellation: "Gevrey-Chambertin Premier Cru",
-    grapes: "100% Pinot Noir",
-    classification: "Premier Cru",
-    cellar: "Rack A / Shelf 3",
-    score: "97",
-    window: "Approaching peak",
-    drinkingWindow: "2028-2040",
-    quantity: "6 bottles",
-    purchase: "$425",
-    market: "$790",
-    service: "16 C / 30 min decant",
-    note: "Perfumed red cherry, rose, fine spice, and mineral length with beautifully resolved tannins.",
-    accent: "from-burgundy-700 to-cellar-walnut"
-  },
-  {
-    producer: "Chateau Leoville Las Cases",
-    wine: "Saint-Julien Grand Vin",
-    vintage: "2016",
-    region: "Bordeaux, France",
-    appellation: "Saint-Julien",
-    grapes: "Cabernet Sauvignon blend",
-    classification: "Second Growth",
-    cellar: "Oak wall / Bin 12",
-    score: "98",
-    window: "Needs aging",
-    drinkingWindow: "2030-2060",
-    quantity: "12 bottles",
-    purchase: "$185",
-    market: "$315",
-    service: "17 C / 120 min decant",
-    note: "Cassis, graphite, cedar, and tobacco with immense structure and a long, precise finish.",
-    accent: "from-cellar-ink to-burgundy-900"
-  },
-  {
-    producer: "Ridge Vineyards",
-    wine: "Monte Bello Cabernet Sauvignon",
-    vintage: "2019",
-    region: "Santa Cruz Mountains, USA",
-    appellation: "Santa Cruz Mountains",
-    grapes: "Cabernet Sauvignon blend",
-    classification: "Estate wine",
-    cellar: "Fridge 2 / Shelf 4",
-    score: "96",
-    window: "Wait 5 years",
-    drinkingWindow: "2032-2065",
-    quantity: "4 bottles",
-    purchase: "$230",
-    market: "$295",
-    service: "17 C / 90 min decant",
-    note: "Mountain cassis, mint, crushed stone, and savory herbs framed by fresh acidity.",
-    accent: "from-cellar-moss to-cellar-slate"
-  },
-  {
-    producer: "Domaine Leflaive",
-    wine: "Puligny-Montrachet Les Pucelles",
-    vintage: "2020",
-    region: "Burgundy, France",
-    appellation: "Puligny-Montrachet Premier Cru",
-    grapes: "100% Chardonnay",
-    classification: "Premier Cru",
-    cellar: "Wine fridge / Shelf 2",
-    score: "96",
-    window: "Approaching peak",
-    drinkingWindow: "2027-2042",
-    quantity: "3 bottles",
-    purchase: "$510",
-    market: "$720",
-    service: "12 C / no decant",
-    note: "White flowers, citrus oil, hazelnut, and chalk with layered texture and electric freshness.",
-    accent: "from-[#a48b55] to-[#596659]"
-  },
-  {
-    producer: "Giacomo Conterno",
-    wine: "Barolo Monfortino Riserva",
-    vintage: "2013",
-    region: "Piedmont, Italy",
-    appellation: "Barolo DOCG",
-    grapes: "100% Nebbiolo",
-    classification: "Riserva",
-    cellar: "West cellar / Bin 7",
-    score: "99",
-    window: "Entering peak",
-    drinkingWindow: "2026-2055",
-    quantity: "2 bottles",
-    purchase: "$680",
-    market: "$1,290",
-    service: "18 C / 180 min decant",
-    note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity.",
-    accent: "from-[#7a2832] to-[#34211d]"
-  },
-  {
-    producer: "Krug",
-    wine: "Grande Cuvee 170eme Edition",
-    vintage: "MV",
-    region: "Champagne, France",
-    appellation: "Champagne",
-    grapes: "Pinot Noir, Chardonnay, Meunier",
-    classification: "Grande Cuvee",
-    cellar: "Wine fridge / Shelf 1",
-    score: "97",
-    window: "Peak drinking",
-    drinkingWindow: "2024-2040",
-    quantity: "5 bottles",
-    purchase: "$195",
-    market: "$255",
-    service: "10 C / no decant",
-    note: "Toasted brioche, citrus, almond, and orchard fruit with extraordinary depth and fine mousse.",
-    accent: "from-[#c2a96f] to-[#4a4d43]"
-  }
-];
+const researchedBottle: CollectionBottle = {
+  producer: "Domaine Leflaive",
+  wine: "Puligny-Montrachet 1er Cru Les Pucelles",
+  vintage: "2020",
+  region: "Burgundy, France",
+  appellation: "Puligny-Montrachet Premier Cru",
+  grapes: "100% Chardonnay",
+  classification: "Premier Cru",
+  cellar: "Location not set",
+  score: "96",
+  window: "Approaching peak",
+  drinkingWindow: "2027-2042",
+  quantity: "1 bottle",
+  purchase: "Not added",
+  market: "Researching",
+  service: "12 C / no decant",
+  note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. The palate is layered and satin-textured, finishing with precise mineral freshness.",
+  accent: "from-[#a48b55] to-[#596659]"
+};
 
 const vintages = [
   ["2015", "97", "Peak", "Rack A"],
@@ -171,11 +87,11 @@ const windows = [
 ];
 
 const regionalCollection = {
-  Burgundy: { bottles: 221, ready: 43, score: "95.1", producer: "Domaine Armand Rousseau", value: "$182,400" },
-  Bordeaux: { bottles: 146, ready: 28, score: "94.6", producer: "Chateau Leoville Las Cases", value: "$96,800" },
-  Champagne: { bottles: 64, ready: 31, score: "94.8", producer: "Krug", value: "$31,200" },
-  Piedmont: { bottles: 52, ready: 14, score: "95.4", producer: "Giacomo Conterno", value: "$42,700" },
-  "Santa Cruz": { bottles: 38, ready: 9, score: "94.2", producer: "Ridge Vineyards", value: "$18,900" }
+  Burgundy: {},
+  Bordeaux: {},
+  Champagne: {},
+  Piedmont: {},
+  "Santa Cruz": {}
 };
 
 const locationProfiles = {
@@ -278,18 +194,15 @@ export default function Home() {
   const [bottleIntent, setBottleIntent] = useState<"collection" | "checking">("collection");
   const [activeDialog, setActiveDialog] = useState<{ title: string; body: string; confirmLabel?: string; onConfirm?: () => void } | null>(null);
   const [favoriteBottles, setFavoriteBottles] = useState<string[]>([]);
-  const [removedBottles, setRemovedBottles] = useState<string[]>([]);
+  const [collectionBottles, setCollectionBottles] = useState<CollectionBottle[]>([]);
   const [selectedVintage, setSelectedVintage] = useState("2018");
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionRegion, setCollectionRegion] = useState("All regions");
   const [collectionSort, setCollectionSort] = useState("producer");
   const [selectedMapRegion, setSelectedMapRegion] = useState<keyof typeof regionalCollection>("Burgundy");
   const tonight = liveTonight ?? locationProfiles[selectedLocation];
-  const collectionTotal = 742 - bottles
-    .filter((bottle) => removedBottles.includes(`${bottle.producer}-${bottle.vintage}`))
-    .reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
-  const visibleBottles = bottles
-    .filter((bottle) => !removedBottles.includes(`${bottle.producer}-${bottle.vintage}`))
+  const collectionTotal = collectionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+  const visibleBottles = collectionBottles
     .filter((bottle) => collectionRegion === "All regions" || bottle.region.includes(collectionRegion))
     .filter((bottle) => `${bottle.producer} ${bottle.wine} ${bottle.vintage} ${bottle.region} ${bottle.grapes}`.toLowerCase().includes(collectionSearch.toLowerCase()))
     .sort((a, b) => {
@@ -297,6 +210,30 @@ export default function Home() {
       if (collectionSort === "vintage") return String(b.vintage).localeCompare(String(a.vintage));
       return a.producer.localeCompare(b.producer);
     });
+  const readyCount = collectionBottles.filter((bottle) => /peak/i.test(bottle.window)).length;
+  const cellarStats = [
+    [String(collectionTotal), "Bottles"],
+    [String(readyCount), "Ready now"],
+    [String(Math.max(collectionTotal - readyCount, 0)), "Resting"],
+    [String(new Set(collectionBottles.map((bottle) => bottle.region)).size), "Regions"]
+  ];
+  const selectedRegionBottles = collectionBottles.filter((bottle) => bottle.region.includes(selectedMapRegion));
+  const selectedRegionTotal = selectedRegionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+  const selectedRegionReady = selectedRegionBottles.filter((bottle) => /peak/i.test(bottle.window)).length;
+  const selectedRegionScore = selectedRegionBottles.length
+    ? (selectedRegionBottles.reduce((total, bottle) => total + Number(bottle.score), 0) / selectedRegionBottles.length).toFixed(1)
+    : "-";
+
+  useEffect(() => {
+    try {
+      localStorage.removeItem("cellar-removed-bottles");
+      localStorage.removeItem("cellar-collection-bottles");
+      const saved = JSON.parse(localStorage.getItem("cellar-collection-bottles-v2") ?? "[]");
+      if (Array.isArray(saved)) setCollectionBottles(saved);
+    } catch {
+      setCollectionBottles([]);
+    }
+  }, []);
 
   function handleBottleImage(file?: File) {
     if (!file) return;
@@ -364,6 +301,38 @@ export default function Home() {
 
   function showDialog(title: string, body: string, confirmLabel?: string, onConfirm?: () => void) {
     setActiveDialog({ title, body, confirmLabel, onConfirm });
+  }
+
+  function persistCollection(next: CollectionBottle[]) {
+    setCollectionBottles(next);
+    try {
+      localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(next));
+    } catch {
+      setCollectionBottles(next);
+    }
+  }
+
+  function saveResearchedBottle() {
+    const key = `${researchedBottle.producer}-${researchedBottle.vintage}`;
+    const existing = collectionBottles.findIndex((bottle) => `${bottle.producer}-${bottle.vintage}` === key);
+    const next = [...collectionBottles];
+    if (existing >= 0) {
+      const quantity = Number.parseInt(next[existing].quantity, 10) + 1;
+      next[existing] = { ...next[existing], quantity: `${quantity} bottles` };
+    } else {
+      next.push(researchedBottle);
+    }
+    persistCollection(next);
+  }
+
+  function deleteBottle(key: string) {
+    const next = collectionBottles.filter((bottle) => `${bottle.producer}-${bottle.vintage}` !== key);
+    setCollectionBottles(next);
+    try {
+      localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(next));
+    } catch {
+      setCollectionBottles(next);
+    }
   }
 
   return (
@@ -529,7 +498,7 @@ export default function Home() {
                 {tonight.weather}
               </div>
               <p className="mt-4 leading-7 text-cellar-walnut">
-                It is entering peak, you own three bottles, and {tonight.reason}
+                {collectionTotal ? `Your collection has ${collectionTotal} bottles, and ${tonight.reason}` : `Add bottles for collection-aware recommendations. For now, ${tonight.reason}`}
               </p>
               <div className="mt-5 grid grid-cols-3 gap-2 text-center text-sm">
                 {tonight.service.map((item) => (
@@ -546,8 +515,9 @@ export default function Home() {
                 <h2 className="font-serif text-2xl">AI Sommelier</h2>
               </div>
               <div className="mt-5 rounded-md bg-white/10 p-4 text-sm leading-6 text-cellar-cream">
-                &quot;For duck tonight, choose the 2018 Clos Saint-Jacques if you want perfume and silk. Keep the 2016
-                Leoville Las Cases asleep; it has another decade of structure to resolve.&quot;
+                {collectionTotal
+                  ? `Your cellar has ${collectionTotal} bottles ready for pairing, maturity, and service guidance.`
+                  : "Your collection is empty. Add a bottle and I will begin offering guidance from your own cellar."}
               </div>
               <div className="mt-4 flex gap-2">
                 <button
@@ -585,10 +555,10 @@ export default function Home() {
             <section className="rounded-lg bg-white/70 p-5 shadow-soft">
               <div className="grid gap-3 sm:grid-cols-4">
                 {[
-                  ["742", "Total bottles"],
-                  ["318", "Red"],
-                  ["186", "White"],
-                  ["42", "Sparkling"]
+                  [String(collectionTotal), "Total bottles"],
+                  ["0", "Red"],
+                  [String(collectionTotal), "White"],
+                  ["0", "Sparkling"]
                 ].map(([value, label]) => (
                   <div className="rounded-md bg-cellar-parchment p-4" key={label}>
                     <p className="font-serif text-3xl">{value}</p>
@@ -598,9 +568,9 @@ export default function Home() {
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {[
-                  ["West cellar", "384 bottles", "Burgundy, Bordeaux, Piedmont"],
-                  ["Wine fridge", "126 bottles", "Champagne, Riesling, Chardonnay"],
-                  ["Offsite storage", "232 bottles", "Long-aging reserves"]
+                  ["West cellar", "0 bottles", "No bottles assigned"],
+                  ["Wine fridge", "0 bottles", "No bottles assigned"],
+                  ["Offsite storage", "0 bottles", "No bottles assigned"]
                 ].map(([zone, count, detail]) => (
                   <article className="rounded-md border border-cellar-oak/18 bg-white/72 p-4" key={zone}>
                     <h3 className="font-serif text-2xl">{zone}</h3>
@@ -616,10 +586,10 @@ export default function Home() {
               <h3 className="mt-2 font-serif text-3xl text-white">What is happening now</h3>
               <div className="mt-5 space-y-3">
                 {[
-                  ["Ready to open", "96 bottles are in their recommended window"],
-                  ["Entering peak", "18 bottles should be revisited this year"],
-                  ["Needs attention", "7 bottles are past the ideal drinking range"],
-                  ["Most represented", "Burgundy leads with 221 bottles"]
+                  ["Ready to open", `${readyCount} bottles are in their recommended window`],
+                  ["Entering peak", collectionTotal ? "Review your researched drinking windows" : "Add a bottle to begin tracking maturity"],
+                  ["Needs attention", "0 bottles are past the ideal drinking range"],
+                  ["Most represented", collectionTotal ? collectionBottles[0].region : "No regions represented yet"]
                 ].map(([title, detail]) => (
                   <div className="rounded-md bg-white/8 p-4" key={title}>
                     <p className="font-medium text-white">{title}</p>
@@ -707,11 +677,16 @@ export default function Home() {
                     : "Upload or take a photo to identify the bottle"}
                 </div>
                 {[
-                  ["Producer", "Domaine Leflaive"],
-                  ["Wine", "Puligny-Montrachet 1er Cru Les Pucelles"],
-                  ["Vintage", "2020"],
-                  ["Region", "Burgundy, Cote de Beaune"],
-                  ["Style", "Structured Chardonnay, cellar-worthy"]
+                  ["Producer", researchedBottle.producer],
+                  ["Wine", researchedBottle.wine],
+                  ["Vintage", researchedBottle.vintage],
+                  ["Region", researchedBottle.region],
+                  ["Appellation", researchedBottle.appellation],
+                  ["Grapes", researchedBottle.grapes],
+                  ["Classification", researchedBottle.classification],
+                  ["Drinking window", researchedBottle.drinkingWindow],
+                  ["Serving", researchedBottle.service],
+                  ["Tasting notes", researchedBottle.note]
                 ].map(([label, value]) => (
                   <div className="flex items-center justify-between rounded-md bg-white/78 px-4 py-3" key={label}>
                     <span className="text-sm text-cellar-walnut">{label}</span>
@@ -721,12 +696,15 @@ export default function Home() {
                 <button
                   className="w-full rounded-md bg-burgundy-700 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-45"
                   disabled={!bottleImagePreview}
-                  onClick={() => showDialog(
-                    bottleIntent === "collection" ? "Bottle added to your collection" : "Wine identified, not saved",
-                    bottleIntent === "collection"
-                      ? "The 2020 Domaine Leflaive Puligny-Montrachet Les Pucelles has been added. You can now set quantity, purchase details, and storage position."
-                      : "This was a private lookup only. The wine and photo were not added to your collection."
-                  )}
+                  onClick={() => {
+                    if (bottleIntent === "collection") saveResearchedBottle();
+                    showDialog(
+                      bottleIntent === "collection" ? "Bottle added to your collection" : "Wine identified, not saved",
+                      bottleIntent === "collection"
+                        ? "The researched wine, tasting notes, drinking window, grapes, classification, and service guidance have been saved to My Bottles."
+                        : `${researchedBottle.note} This research was not saved to your collection.`
+                    );
+                  }}
                 >
                   {bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving"}
                 </button>
@@ -736,7 +714,7 @@ export default function Home() {
 
           <Panel title="Collection Dashboard" eyebrow="Live cellar" icon={<BarChart3 className="size-5" />} id="dashboard">
             <div className="grid gap-3 sm:grid-cols-3">
-              {["Ready now 96", "Avg score 94.2", "Wishlist 38"].map((item) => (
+              {[`${collectionTotal} bottles`, `Ready now ${readyCount}`, `${new Set(collectionBottles.map((bottle) => bottle.region)).size} regions`].map((item) => (
                 <div className="rounded-md bg-white/75 p-4 font-medium" key={item}>{item}</div>
               ))}
             </div>
@@ -846,7 +824,7 @@ export default function Home() {
                           `Remove ${bottle.vintage} ${bottle.producer}?`,
                           `This will remove ${bottle.quantity} of ${bottle.wine} from your collection. This action cannot be undone.`,
                           "Delete bottles",
-                          () => setRemovedBottles((current) => [...current, `${bottle.producer}-${bottle.vintage}`])
+                          () => deleteBottle(`${bottle.producer}-${bottle.vintage}`)
                         )}
                       >
                         <Trash2 className="size-4" aria-hidden />
@@ -859,7 +837,7 @@ export default function Home() {
           </div>
           {visibleBottles.length === 0 && (
             <div className="rounded-lg border border-dashed border-cellar-oak/30 bg-white/50 p-10 text-center text-cellar-walnut">
-              No bottles match those filters.
+              {collectionBottles.length ? "No bottles match those filters." : "Your cellar is empty. Add a bottle photo to begin your collection."}
             </div>
           )}
         </div>
@@ -909,12 +887,12 @@ export default function Home() {
                   <p className="text-xs uppercase tracking-[0.16em] text-cellar-gold">Selected region</p>
                   <h3 className="mt-2 font-serif text-3xl text-white">{selectedMapRegion}</h3>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div><p className="text-cellar-cream/55">Bottles</p><p className="mt-1 font-medium text-white">{regionalCollection[selectedMapRegion].bottles}</p></div>
-                    <div><p className="text-cellar-cream/55">Ready now</p><p className="mt-1 font-medium text-white">{regionalCollection[selectedMapRegion].ready}</p></div>
-                    <div><p className="text-cellar-cream/55">Average score</p><p className="mt-1 font-medium text-white">{regionalCollection[selectedMapRegion].score}</p></div>
-                    <div><p className="text-cellar-cream/55">Collection value</p><p className="mt-1 font-medium text-white">{regionalCollection[selectedMapRegion].value}</p></div>
+                    <div><p className="text-cellar-cream/55">Bottles</p><p className="mt-1 font-medium text-white">{selectedRegionTotal}</p></div>
+                    <div><p className="text-cellar-cream/55">Ready now</p><p className="mt-1 font-medium text-white">{selectedRegionReady}</p></div>
+                    <div><p className="text-cellar-cream/55">Average score</p><p className="mt-1 font-medium text-white">{selectedRegionScore}</p></div>
+                    <div><p className="text-cellar-cream/55">Collection value</p><p className="mt-1 font-medium text-white">{selectedRegionBottles.length ? "Researching" : "-"}</p></div>
                   </div>
-                  <p className="mt-4 text-sm text-cellar-cream/65">Most owned: {regionalCollection[selectedMapRegion].producer}</p>
+                  <p className="mt-4 text-sm text-cellar-cream/65">Most owned: {selectedRegionBottles[0]?.producer ?? "None yet"}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(regionalCollection) as Array<keyof typeof regionalCollection>).map((region) => (

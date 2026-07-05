@@ -3,6 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#65142c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Cellar" />
+    <link rel="manifest" href="./public/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./public/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./public/icon-192.png" />
     <title>Cellar</title>
     <style>
       :root {
@@ -755,7 +762,7 @@
     <main class="shell">
       <header class="topbar">
         <div class="brand">
-          <div class="mark">V</div>
+          <div class="mark">C</div>
           <div><strong class="serif">Cellar</strong><span>Private collection</span></div>
         </div>
         <div class="actions">
@@ -790,10 +797,10 @@
           <p>Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which vintage deserves the table tonight.</p>
           <div class="bottle"><div class="label"><small>Grand Cru</small><b>Cellar</b><p>AI Selected</p><b>2018</b></div></div>
           <div class="stats">
-            <div class="stat"><strong>742</strong><span>Bottles</span></div>
-            <div class="stat"><strong>96</strong><span>Ready now</span></div>
-            <div class="stat"><strong>214</strong><span>Resting</span></div>
-            <div class="stat"><strong>14</strong><span>Regions</span></div>
+            <div class="stat"><strong id="stat-bottles">0</strong><span>Bottles</span></div>
+            <div class="stat"><strong id="stat-ready">0</strong><span>Ready now</span></div>
+            <div class="stat"><strong id="stat-resting">0</strong><span>Resting</span></div>
+            <div class="stat"><strong id="stat-regions">0</strong><span>Regions</span></div>
           </div>
         </section>
 
@@ -820,13 +827,13 @@
             </div>
             <p class="location-status" id="location-status" role="status"></p>
             <div class="weather-line" id="tonight-weather">18 C / cool evening</div>
-            <p class="copy" id="tonight-reason">It is entering peak, you own three bottles, and cool Paris weather favors braised short rib, porcini risotto, or aged Comte.</p>
+            <p class="copy" id="tonight-reason">Add bottles to receive collection-aware recommendations. Cool Paris weather currently favors braised short rib, porcini risotto, or aged Comte.</p>
             <div class="chips"><div class="chip" id="tonight-temp">18 C</div><div class="chip" id="tonight-decant">45 min</div><div class="chip" id="tonight-window">2026-2034</div></div>
           </section>
           <section class="panel dark" id="sommelier">
             <p class="eyebrow">AI Sommelier</p>
             <h2>Warm, expert, never pretentious.</h2>
-            <p class="copy">For duck tonight, choose the 2018 Clos Saint-Jacques if you want perfume and silk. Keep the 2016 Leoville Las Cases asleep.</p>
+            <p class="copy">Your collection is empty. Add a bottle and I will begin offering maturity, pairing, and service guidance from your own cellar.</p>
             <div class="chips">
               <button class="chip" data-action="Ask the AI Sommelier" data-copy="Ask what to open, what to hold, or what works with tonight's meal. The sommelier considers your collection, maturity, weather, and how many bottles remain.">Ask</button>
               <button class="chip" data-action="Food pairing" data-copy="Tell the sommelier what you are cooking and it will choose mature bottles from your cellar, with serving and decanting guidance.">Pair</button>
@@ -847,24 +854,24 @@
         <div class="overview-grid">
           <div class="panel">
             <div class="overview-stats">
-              <div class="mini"><strong>742</strong><span>Total bottles</span></div>
-              <div class="mini"><strong>318</strong><span>Red</span></div>
-              <div class="mini"><strong>186</strong><span>White</span></div>
-              <div class="mini"><strong>42</strong><span>Sparkling</span></div>
+              <div class="mini"><strong id="overview-total">0</strong><span>Total bottles</span></div>
+              <div class="mini"><strong id="overview-red">0</strong><span>Red</span></div>
+              <div class="mini"><strong id="overview-white">0</strong><span>White</span></div>
+              <div class="mini"><strong id="overview-sparkling">0</strong><span>Sparkling</span></div>
             </div>
             <div class="overview-zones">
-              <article class="zone"><h3>West cellar</h3><strong>384 bottles</strong><p>Burgundy, Bordeaux, Piedmont</p></article>
-              <article class="zone"><h3>Wine fridge</h3><strong>126 bottles</strong><p>Champagne, Riesling, Chardonnay</p></article>
-              <article class="zone"><h3>Offsite storage</h3><strong>232 bottles</strong><p>Long-aging reserves</p></article>
+              <article class="zone"><h3>West cellar</h3><strong>0 bottles</strong><p>No bottles assigned</p></article>
+              <article class="zone"><h3>Wine fridge</h3><strong>0 bottles</strong><p>No bottles assigned</p></article>
+              <article class="zone"><h3>Offsite storage</h3><strong>0 bottles</strong><p>No bottles assigned</p></article>
             </div>
           </div>
           <div class="panel dark">
             <p class="eyebrow">Collection pulse</p>
             <h2>What is happening now</h2>
-            <div class="pulse-item"><strong>Ready to open</strong><span>96 bottles are in their recommended window</span></div>
-            <div class="pulse-item"><strong>Entering peak</strong><span>18 bottles should be revisited this year</span></div>
-            <div class="pulse-item"><strong>Needs attention</strong><span>7 bottles are past the ideal drinking range</span></div>
-            <div class="pulse-item"><strong>Most represented</strong><span>Burgundy leads with 221 bottles</span></div>
+            <div class="pulse-item"><strong>Ready to open</strong><span id="pulse-ready">0 bottles are in their recommended window</span></div>
+            <div class="pulse-item"><strong>Entering peak</strong><span>Add a bottle to begin tracking maturity</span></div>
+            <div class="pulse-item"><strong>Needs attention</strong><span>0 bottles are past the ideal drinking range</span></div>
+            <div class="pulse-item"><strong>Most represented</strong><span id="pulse-region">No regions represented yet</span></div>
           </div>
         </div>
       </section>
@@ -904,7 +911,13 @@
               <div class="row"><span>Producer</span><strong>Domaine Leflaive</strong></div>
               <div class="row"><span>Wine</span><strong>Puligny-Montrachet Les Pucelles</strong></div>
               <div class="row"><span>Vintage</span><strong>2020</strong></div>
-              <div class="row"><span>Style</span><strong>Cellar-worthy Chardonnay</strong></div>
+              <div class="row"><span>Region</span><strong>Burgundy, France</strong></div>
+              <div class="row"><span>Appellation</span><strong>Puligny-Montrachet Premier Cru</strong></div>
+              <div class="row"><span>Grapes</span><strong>100% Chardonnay</strong></div>
+              <div class="row"><span>Classification</span><strong>Premier Cru</strong></div>
+              <div class="row"><span>Drinking window</span><strong>2027-2042</strong></div>
+              <div class="row"><span>Serving</span><strong>12 C / no decant</strong></div>
+              <div class="row"><span>Tasting notes</span><strong>White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. Layered, satin-textured, and mineral.</strong></div>
               <button class="identify-action" id="identify-action" disabled>Identify and add bottle</button>
             </div>
           </div>
@@ -923,12 +936,12 @@
             <p class="eyebrow">Selected region</p>
             <h3 id="map-region-name">Burgundy</h3>
             <div class="map-stats">
-              <div><small>Bottles</small><strong id="map-bottles">221</strong></div>
-              <div><small>Ready now</small><strong id="map-ready">43</strong></div>
-              <div><small>Average score</small><strong id="map-score">95.1</strong></div>
-              <div><small>Collection value</small><strong id="map-value">$182,400</strong></div>
+              <div><small>Bottles</small><strong id="map-bottles">0</strong></div>
+              <div><small>Ready now</small><strong id="map-ready">0</strong></div>
+              <div><small>Average score</small><strong id="map-score">-</strong></div>
+              <div><small>Collection value</small><strong id="map-value">-</strong></div>
             </div>
-            <p class="map-producer">Most owned: <span id="map-producer">Domaine Armand Rousseau</span></p>
+            <p class="map-producer">Most owned: <span id="map-producer">None yet</span></p>
           </div>
           <button class="open-link" id="view-region-bottles">View Burgundy bottles</button>
         </section>
@@ -937,7 +950,7 @@
       <section class="collection" id="my-collection">
         <div class="collection-head">
           <div>
-            <p class="eyebrow">My bottles / <span id="collection-total">742</span> total</p>
+            <p class="eyebrow">My bottles / <span id="collection-total">0</span> total</p>
             <h2>Your complete collection</h2>
             <p class="collection-subtitle">Detailed cards for every vintage, bottle, and storage location.</p>
           </div>
@@ -987,6 +1000,25 @@
       const identifyAction = document.getElementById("identify-action");
       let bottleIntent = "collection";
       let bottlePhotoReady = false;
+      const researchedBottle = {
+        producer: "Domaine Leflaive",
+        wine: "Puligny-Montrachet 1er Cru Les Pucelles",
+        vintage: "2020",
+        region: "Burgundy, France",
+        appellation: "Puligny-Montrachet Premier Cru",
+        classification: "Premier Cru",
+        grapes: "100% Chardonnay",
+        score: 96,
+        maturity: "Approaching peak",
+        window: "2027-2042",
+        quantity: "1 bottle",
+        storage: "Location not set",
+        service: "12 C / no decant",
+        purchase: "Not added",
+        market: "Researching",
+        color: "linear-gradient(135deg,#a48b55,#596659)",
+        note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. The palate is layered and satin-textured, finishing with precise mineral freshness."
+      };
 
       function updateBottleIntent() {
         scanChoices.forEach((choice) => {
@@ -1021,11 +1053,12 @@
       });
       identifyAction.addEventListener("click", () => {
         if (!bottlePhotoReady) return;
+        if (bottleIntent === "collection") saveResearchedBottle();
         openActionModal(
           bottleIntent === "collection" ? "Bottle added to your collection" : "Wine identified, not saved",
           bottleIntent === "collection"
-            ? "The 2020 Domaine Leflaive Puligny-Montrachet Les Pucelles has been added. You can now set quantity, purchase details, and storage position."
-            : "This was a private lookup only. The wine and photo were not added to your collection."
+            ? "The wine, tasting notes, drinking window, grapes, classification, and service guidance are saved in My Bottles."
+            : `${researchedBottle.note} This research was not saved to your collection.`
         );
       });
 
@@ -1046,25 +1079,25 @@
         paris: {
           weather: "18 C / cool evening",
           bottle: "Open the 2017 Barolo",
-          reason: "It is entering peak, you own three bottles, and cool Paris weather favors braised short rib, porcini risotto, or aged Comte.",
+          reason: "Cool Paris weather favors braised short rib, porcini risotto, or aged Comte. Add bottles for collection-aware recommendations.",
           service: ["18 C", "45 min", "2026-2034"]
         },
         newYork: {
           weather: "26 C / humid",
           bottle: "Open the 2020 Puligny-Montrachet",
-          reason: "It is entering peak, you own three bottles, and a warmer, humid night calls for something lifted and precise with roast chicken, grilled corn, or lemony seafood.",
+          reason: "A warmer, humid night calls for something lifted and precise with roast chicken, grilled corn, or lemony seafood.",
           service: ["11 C", "0 min", "2025-2030"]
         },
         sanFrancisco: {
           weather: "15 C / foggy",
           bottle: "Open the 2018 Clos Saint-Jacques",
-          reason: "It is entering peak, you own three bottles, and the foggy evening suits aromatic Burgundy with duck, mushrooms, salmon, or a simple roast bird.",
+          reason: "The foggy evening suits aromatic Burgundy with duck, mushrooms, salmon, or a simple roast bird.",
           service: ["16 C", "30 min", "2028-2038"]
         },
         london: {
           weather: "14 C / rainy",
           bottle: "Open the 2016 Saint-Julien half bottle",
-          reason: "It is entering peak, you own three bottles, and a rainy evening makes structured Bordeaux feel right with lamb, lentils, or a savory pie.",
+          reason: "A rainy evening makes structured Bordeaux feel right with lamb, lentils, or a savory pie.",
           service: ["17 C", "60 min", "2027-2042"]
         }
       };
@@ -1187,21 +1220,60 @@
         );
       });
 
-      const collectionBottles = [
-        { producer: "Domaine Armand Rousseau", wine: "Gevrey-Chambertin Clos Saint-Jacques", vintage: "2018", region: "Burgundy, France", appellation: "Gevrey-Chambertin Premier Cru", classification: "Premier Cru", grapes: "100% Pinot Noir", score: 97, maturity: "Approaching peak", window: "2028-2040", quantity: "6 bottles", storage: "Rack A / Shelf 3", service: "16 C / 30 min", purchase: "$425", market: "$790", color: "linear-gradient(135deg,#65142c,#4b3029)", note: "Perfumed red cherry, rose, fine spice, and mineral length with beautifully resolved tannins." },
-        { producer: "Chateau Leoville Las Cases", wine: "Saint-Julien Grand Vin", vintage: "2016", region: "Bordeaux, France", appellation: "Saint-Julien", classification: "Second Growth", grapes: "Cabernet Sauvignon blend", score: 98, maturity: "Needs aging", window: "2030-2060", quantity: "12 bottles", storage: "Oak wall / Bin 12", service: "17 C / 120 min", purchase: "$185", market: "$315", color: "linear-gradient(135deg,#201715,#3b0c1b)", note: "Cassis, graphite, cedar, and tobacco with immense structure and a long, precise finish." },
-        { producer: "Ridge Vineyards", wine: "Monte Bello Cabernet Sauvignon", vintage: "2019", region: "Santa Cruz Mountains, USA", appellation: "Santa Cruz Mountains", classification: "Estate wine", grapes: "Cabernet Sauvignon blend", score: 96, maturity: "Wait 5 years", window: "2032-2065", quantity: "4 bottles", storage: "Fridge 2 / Shelf 4", service: "17 C / 90 min", purchase: "$230", market: "$295", color: "linear-gradient(135deg,#637456,#4e5b5b)", note: "Mountain cassis, mint, crushed stone, and savory herbs framed by fresh acidity." },
-        { producer: "Domaine Leflaive", wine: "Puligny-Montrachet Les Pucelles", vintage: "2020", region: "Burgundy, France", appellation: "Puligny-Montrachet Premier Cru", classification: "Premier Cru", grapes: "100% Chardonnay", score: 96, maturity: "Approaching peak", window: "2027-2042", quantity: "3 bottles", storage: "Wine fridge / Shelf 2", service: "12 C / no decant", purchase: "$510", market: "$720", color: "linear-gradient(135deg,#a48b55,#596659)", note: "White flowers, citrus oil, hazelnut, and chalk with layered texture and electric freshness." },
-        { producer: "Giacomo Conterno", wine: "Barolo Monfortino Riserva", vintage: "2013", region: "Piedmont, Italy", appellation: "Barolo DOCG", classification: "Riserva", grapes: "100% Nebbiolo", score: 99, maturity: "Entering peak", window: "2026-2055", quantity: "2 bottles", storage: "West cellar / Bin 7", service: "18 C / 180 min", purchase: "$680", market: "$1,290", color: "linear-gradient(135deg,#7a2832,#34211d)", note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity." },
-        { producer: "Krug", wine: "Grande Cuvee 170eme Edition", vintage: "MV", region: "Champagne, France", appellation: "Champagne", classification: "Grande Cuvee", grapes: "Pinot Noir, Chardonnay, Meunier", score: 97, maturity: "Peak drinking", window: "2024-2040", quantity: "5 bottles", storage: "Wine fridge / Shelf 1", service: "10 C / no decant", purchase: "$195", market: "$255", color: "linear-gradient(135deg,#c2a96f,#4a4d43)", note: "Toasted brioche, citrus, almond, and orchard fruit with extraordinary depth and fine mousse." }
-      ];
+      let collectionBottles = [];
+      try {
+        localStorage.removeItem("cellar-removed-bottles");
+        localStorage.removeItem("cellar-collection-bottles");
+        const savedCollection = JSON.parse(localStorage.getItem("cellar-collection-bottles-v2") || "[]");
+        if (Array.isArray(savedCollection)) collectionBottles = savedCollection;
+      } catch (error) {
+        collectionBottles = [];
+      }
       const collectionSearch = document.getElementById("collection-search");
       const collectionRegion = document.getElementById("collection-region");
       const collectionSort = document.getElementById("collection-sort");
       const collectionGrid = document.getElementById("collection-grid");
       const collectionCount = document.getElementById("collection-count");
       const collectionTotalLabel = document.getElementById("collection-total");
-      let collectionTotal = 742;
+      let collectionTotal = 0;
+
+      function persistCollection() {
+        try {
+          localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(collectionBottles));
+        } catch (error) {
+          console.warn("Collection changes could not be saved on this device.");
+        }
+      }
+
+      function saveResearchedBottle() {
+        const key = `${researchedBottle.producer}-${researchedBottle.vintage}`;
+        const existing = collectionBottles.findIndex((wine) => `${wine.producer}-${wine.vintage}` === key);
+        if (existing >= 0) {
+          const quantity = Number.parseInt(collectionBottles[existing].quantity, 10) + 1;
+          collectionBottles[existing].quantity = `${quantity} bottles`;
+        } else {
+          collectionBottles.push({ ...researchedBottle });
+        }
+        persistCollection();
+        updateCollectionStats();
+        renderCollection();
+      }
+
+      function updateCollectionStats() {
+        collectionTotal = collectionBottles.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+        const ready = collectionBottles.filter((wine) => /peak/i.test(wine.maturity)).length;
+        const regions = new Set(collectionBottles.map((wine) => wine.region));
+        collectionTotalLabel.textContent = collectionTotal;
+        document.getElementById("stat-bottles").textContent = collectionTotal;
+        document.getElementById("stat-ready").textContent = ready;
+        document.getElementById("stat-resting").textContent = Math.max(collectionTotal - ready, 0);
+        document.getElementById("stat-regions").textContent = regions.size;
+        document.getElementById("overview-total").textContent = collectionTotal;
+        document.getElementById("overview-white").textContent = collectionTotal;
+        document.getElementById("pulse-ready").textContent = `${ready} bottles are in their recommended window`;
+        document.getElementById("pulse-region").textContent = collectionBottles.length ? collectionBottles[0].region : "No regions represented yet";
+        selectMapRegion(selectedMapRegion);
+      }
 
       function renderCollection() {
         const query = collectionSearch.value.trim().toLowerCase();
@@ -1214,7 +1286,7 @@
 
         collectionCount.textContent = `${visible.length} collection cards shown`;
         if (!visible.length) {
-          collectionGrid.innerHTML = '<div class="collection-empty">No bottles match those filters.</div>';
+          collectionGrid.innerHTML = `<div class="collection-empty">${collectionBottles.length ? "No bottles match those filters." : "Your cellar is empty. Add a bottle photo to begin your collection."}</div>`;
           return;
         }
         collectionGrid.innerHTML = visible.map((wine) => `
@@ -1261,11 +1333,7 @@
       collectionSort.addEventListener("change", renderCollection);
 
       const regionalCollection = {
-        Burgundy: { bottles: 221, ready: 43, score: "95.1", producer: "Domaine Armand Rousseau", value: "$182,400" },
-        Bordeaux: { bottles: 146, ready: 28, score: "94.6", producer: "Chateau Leoville Las Cases", value: "$96,800" },
-        Champagne: { bottles: 64, ready: 31, score: "94.8", producer: "Krug", value: "$31,200" },
-        Piedmont: { bottles: 52, ready: 14, score: "95.4", producer: "Giacomo Conterno", value: "$42,700" },
-        "Santa Cruz": { bottles: 38, ready: 9, score: "94.2", producer: "Ridge Vineyards", value: "$18,900" }
+        Burgundy: {}, Bordeaux: {}, Champagne: {}, Piedmont: {}, "Santa Cruz": {}
       };
       const mapNodes = document.querySelectorAll(".map-node");
       const mapRegionName = document.getElementById("map-region-name");
@@ -1279,14 +1347,19 @@
 
       function selectMapRegion(region) {
         selectedMapRegion = region;
-        const details = regionalCollection[region];
+        const regionWines = collectionBottles.filter((wine) => wine.region.includes(region));
+        const bottleCount = regionWines.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+        const readyCount = regionWines.filter((wine) => /peak/i.test(wine.maturity)).length;
+        const averageScore = regionWines.length
+          ? (regionWines.reduce((total, wine) => total + Number(wine.score), 0) / regionWines.length).toFixed(1)
+          : "-";
         mapNodes.forEach((node) => node.classList.toggle("active", node.dataset.region === region));
         mapRegionName.textContent = region;
-        mapBottles.textContent = details.bottles;
-        mapReady.textContent = details.ready;
-        mapScore.textContent = details.score;
-        mapValue.textContent = details.value;
-        mapProducer.textContent = details.producer;
+        mapBottles.textContent = bottleCount;
+        mapReady.textContent = readyCount;
+        mapScore.textContent = averageScore;
+        mapValue.textContent = regionWines.length ? "Researching" : "-";
+        mapProducer.textContent = regionWines[0]?.producer || "None yet";
         viewRegionBottles.textContent = `View ${region} bottles`;
       }
 
@@ -1334,6 +1407,7 @@
         pendingDeleteKey = "";
       }
 
+      updateCollectionStats();
       renderCollection();
       document.querySelectorAll("[data-action]").forEach((control) => {
         if (control.dataset.bound === "true") return;
@@ -1345,9 +1419,9 @@
         if (pendingDeleteKey) {
           const index = collectionBottles.findIndex((wine) => `${wine.producer}-${wine.vintage}` === pendingDeleteKey);
           if (index >= 0) {
-            collectionTotal -= Number.parseInt(collectionBottles[index].quantity, 10);
-            collectionTotalLabel.textContent = collectionTotal;
             collectionBottles.splice(index, 1);
+            persistCollection();
+            updateCollectionStats();
           }
           renderCollection();
         }
