@@ -19,6 +19,7 @@ import {
   MessageCircle,
   ScanLine,
   Search,
+  Send,
   ShieldCheck,
   Sparkles,
   ThermometerSun,
@@ -200,6 +201,10 @@ export default function Home() {
   const [collectionRegion, setCollectionRegion] = useState("All regions");
   const [collectionSort, setCollectionSort] = useState("producer");
   const [selectedMapRegion, setSelectedMapRegion] = useState<keyof typeof regionalCollection>("Burgundy");
+  const [sommelierInput, setSommelierInput] = useState("");
+  const [sommelierMessages, setSommelierMessages] = useState<Array<{ role: "assistant" | "user"; text: string }>>([
+    { role: "assistant", text: "Good evening. What are you cooking, or what would you like to open?" }
+  ]);
   const tonight = liveTonight ?? locationProfiles[selectedLocation];
   const collectionTotal = collectionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
   const visibleBottles = collectionBottles
@@ -333,6 +338,48 @@ export default function Home() {
     } catch {
       setCollectionBottles(next);
     }
+  }
+
+  function getSommelierReply(question: string) {
+    const query = question.toLowerCase();
+    const white = collectionBottles.find((bottle) => /chardonnay|riesling|sauvignon|white/i.test(`${bottle.grapes} ${bottle.wine}`));
+    const red = collectionBottles.find((bottle) => /pinot noir|cabernet|nebbiolo|syrah|merlot/i.test(`${bottle.grapes} ${bottle.wine}`));
+    const bottle = collectionBottles[0];
+
+    if (/duck|lamb|beef|steak/.test(query)) {
+      return red
+        ? `Open your ${red.vintage} ${red.producer} ${red.wine}. Serve it ${red.service}; its ${red.window.toLowerCase()} profile should suit the richness of the dish.`
+        : "Your cellar does not yet contain an ideal red for that dish. Look for Pinot Noir with duck, Cabernet with beef, or Nebbiolo with lamb.";
+    }
+    if (/fish|salmon|seafood|chicken|vegetable/.test(query)) {
+      return white
+        ? `Choose your ${white.vintage} ${white.producer} ${white.wine}. ${white.note} Serve it ${white.service}.`
+        : "Look for a mineral Chardonnay, dry Riesling, or restrained Sauvignon Blanc. Add one to Cellar and I can recommend the exact bottle.";
+    }
+    if (/tonight|open|ready|drink now/.test(query)) {
+      return bottle
+        ? `Your best current option is the ${bottle.vintage} ${bottle.producer} ${bottle.wine}. Its drinking window is ${bottle.drinkingWindow}; serve it ${bottle.service}.`
+        : "Your collection is empty, so I cannot choose a bottle yet. Tell me what is for dinner and I can still recommend a style.";
+    }
+    if (/age|aging|hold|keep/.test(query)) {
+      return bottle
+        ? `The ${bottle.vintage} ${bottle.wine} is ${bottle.window.toLowerCase()}, with a researched window of ${bottle.drinkingWindow}. Revisit it at the beginning of that window.`
+        : "Add a bottle and I will assess its vintage, region, producer, structure, and drinking window.";
+    }
+    if (/pair|food|cook|dinner/.test(query)) {
+      return "Tell me the main ingredient and preparation, such as roast duck, grilled salmon, mushroom risotto, or steak.";
+    }
+    return bottle
+      ? `I see ${collectionTotal} bottle${collectionTotal === 1 ? "" : "s"} in your cellar. Ask about pairing, serving, maturity, or whether to open the ${bottle.vintage} ${bottle.wine}.`
+      : "I can help with pairings, serving temperatures, regions, and aging. Add a bottle for collection-specific advice.";
+  }
+
+  function sendSommelierMessage(prompt?: string) {
+    const question = (prompt ?? sommelierInput).trim();
+    if (!question) return;
+    const reply = getSommelierReply(question);
+    setSommelierMessages((current) => [...current, { role: "user", text: question }, { role: "assistant", text: reply }]);
+    setSommelierInput("");
   }
 
   return (
@@ -514,25 +561,40 @@ export default function Home() {
                 <MessageCircle className="size-5 text-cellar-gold" aria-hidden />
                 <h2 className="font-serif text-2xl">AI Sommelier</h2>
               </div>
-              <div className="mt-5 rounded-md bg-white/10 p-4 text-sm leading-6 text-cellar-cream">
-                {collectionTotal
-                  ? `Your cellar has ${collectionTotal} bottles ready for pairing, maturity, and service guidance.`
-                  : "Your collection is empty. Add a bottle and I will begin offering guidance from your own cellar."}
+              <div className="mt-4 flex min-h-56 max-h-80 flex-col gap-2 overflow-y-auto rounded-md bg-black/15 p-3" aria-live="polite">
+                {sommelierMessages.map((message, index) => (
+                  <div
+                    className={`max-w-[88%] rounded-md px-3 py-2 text-sm leading-6 ${message.role === "user" ? "self-end bg-white text-burgundy-900" : "self-start bg-white/10 text-cellar-cream"}`}
+                    key={`${message.role}-${index}`}
+                  >
+                    {message.text}
+                  </div>
+                ))}
               </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  className="flex-1 rounded-md bg-white px-3 py-3 text-sm font-medium text-burgundy-900"
-                  onClick={() => showDialog("Ask the AI Sommelier", "Try: What should I open with duck tonight? The sommelier will consider maturity, food, weather, and how many bottles remain.")}
-                >
-                  Ask
+              <form
+                className="mt-3 grid grid-cols-[1fr_auto] gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  sendSommelierMessage();
+                }}
+              >
+                <input
+                  className="min-w-0 rounded-md border-0 bg-white px-3 py-3 text-sm text-cellar-ink outline-none"
+                  value={sommelierInput}
+                  onChange={(event) => setSommelierInput(event.target.value)}
+                  placeholder="Ask the sommelier"
+                  aria-label="Message the AI Sommelier"
+                />
+                <button className="grid size-11 place-items-center rounded-md bg-cellar-gold text-cellar-ink" aria-label="Send message" type="submit">
+                  <Send className="size-4" aria-hidden />
                 </button>
-                <button
-                  className="grid size-11 place-items-center rounded-md border border-white/25"
-                  aria-label="Search cellar"
-                  onClick={() => showDialog("Search your cellar", "Search by producer, region, vintage, grape, drinking window, or a natural-language phrase such as French wines ready now.")}
-                >
-                  <Search className="size-4" aria-hidden />
-                </button>
+              </form>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {["What pairs with duck?", "What should I open tonight?", "Which wines should I keep aging?"].map((prompt) => (
+                  <button className="rounded-full border border-white/20 px-3 py-2 text-xs text-cellar-cream" key={prompt} onClick={() => sendSommelierMessage(prompt)}>
+                    {prompt}
+                  </button>
+                ))}
               </div>
             </section>
           </aside>

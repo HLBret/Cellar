@@ -238,6 +238,54 @@
       .chip { border-radius: 6px; background: rgba(255,255,255,.72); padding: 13px 8px; text-align: center; font-weight: 700; }
       .panel.dark .chip { background: rgba(255,255,255,.1); color: white; }
       button.chip { width: 100%; }
+      .sommelier-chat {
+        display: flex;
+        min-height: 230px;
+        max-height: 330px;
+        flex-direction: column;
+        gap: 9px;
+        margin-top: 16px;
+        overflow-y: auto;
+        border-radius: 6px;
+        background: rgba(0,0,0,.16);
+        padding: 12px;
+      }
+      .chat-message {
+        max-width: 88%;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .chat-message.assistant { align-self: flex-start; background: rgba(255,255,255,.1); color: var(--cream); }
+      .chat-message.user { align-self: flex-end; background: var(--paper); color: var(--wine); }
+      .sommelier-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+      .sommelier-form input {
+        min-width: 0;
+        border: 0;
+        border-radius: 6px;
+        background: white;
+        color: var(--ink);
+        padding: 12px;
+        font: inherit;
+        outline: none;
+      }
+      .sommelier-send {
+        border-radius: 6px;
+        background: var(--gold);
+        color: var(--ink);
+        padding: 0 15px;
+        font-weight: 800;
+      }
+      .sommelier-prompts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+      .sommelier-prompts button {
+        border: 1px solid rgba(255,255,255,.22);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--cream);
+        padding: 7px 9px;
+        font-size: 12px;
+      }
       .location-field {
         display: flex;
         align-items: center;
@@ -832,12 +880,18 @@
           </section>
           <section class="panel dark" id="sommelier">
             <p class="eyebrow">AI Sommelier</p>
-            <h2>Warm, expert, never pretentious.</h2>
-            <p class="copy">Your collection is empty. Add a bottle and I will begin offering maturity, pairing, and service guidance from your own cellar.</p>
-            <div class="chips">
-              <button class="chip" data-action="Ask the AI Sommelier" data-copy="Ask what to open, what to hold, or what works with tonight's meal. The sommelier considers your collection, maturity, weather, and how many bottles remain.">Ask</button>
-              <button class="chip" data-action="Food pairing" data-copy="Tell the sommelier what you are cooking and it will choose mature bottles from your cellar, with serving and decanting guidance.">Pair</button>
-              <button class="chip" data-action="Compare vintages" data-copy="Choose two or more vintages to compare structure, maturity, weather, drinking windows, and style in plain English.">Compare</button>
+            <h2>Ask about wine or dinner.</h2>
+            <div class="sommelier-chat" id="sommelier-messages" aria-live="polite">
+              <div class="chat-message assistant">Good evening. What are you cooking, or what would you like to open?</div>
+            </div>
+            <form class="sommelier-form" id="sommelier-form">
+              <input id="sommelier-input" type="text" placeholder="Ask the sommelier" autocomplete="off" aria-label="Message the AI Sommelier" />
+              <button class="sommelier-send" type="submit">Send</button>
+            </form>
+            <div class="sommelier-prompts">
+              <button type="button" data-sommelier-prompt="What pairs with duck?">Pair with duck</button>
+              <button type="button" data-sommelier-prompt="What should I open tonight?">Open tonight</button>
+              <button type="button" data-sommelier-prompt="Which wines should I keep aging?">Keep aging</button>
             </div>
           </section>
         </aside>
@@ -1331,6 +1385,68 @@
       collectionSearch.addEventListener("input", renderCollection);
       collectionRegion.addEventListener("change", renderCollection);
       collectionSort.addEventListener("change", renderCollection);
+
+      const sommelierMessages = document.getElementById("sommelier-messages");
+      const sommelierForm = document.getElementById("sommelier-form");
+      const sommelierInput = document.getElementById("sommelier-input");
+
+      function addSommelierMessage(role, text) {
+        const message = document.createElement("div");
+        message.className = `chat-message ${role}`;
+        message.textContent = text;
+        sommelierMessages.appendChild(message);
+        sommelierMessages.scrollTop = sommelierMessages.scrollHeight;
+      }
+
+      function sommelierReply(question) {
+        const query = question.toLowerCase();
+        const white = collectionBottles.find((wine) => /chardonnay|riesling|sauvignon|white/i.test(`${wine.grapes} ${wine.wine}`));
+        const red = collectionBottles.find((wine) => /pinot noir|cabernet|nebbiolo|syrah|merlot/i.test(`${wine.grapes} ${wine.wine}`));
+        const bottle = collectionBottles[0];
+
+        if (/duck|lamb|beef|steak/.test(query)) {
+          return red
+            ? `I would open your ${red.vintage} ${red.producer} ${red.wine}. Serve it ${red.service}; its ${red.maturity.toLowerCase()} profile should suit the richness of the dish.`
+            : "Your cellar does not yet contain an ideal red for that dish. Look for Pinot Noir with duck, Cabernet with beef, or Nebbiolo with lamb.";
+        }
+        if (/fish|salmon|seafood|chicken|vegetable/.test(query)) {
+          return white
+            ? `Choose your ${white.vintage} ${white.producer} ${white.wine}. ${white.note} Serve it ${white.service}.`
+            : "I would look for a mineral Chardonnay, dry Riesling, or restrained Sauvignon Blanc. Add one to Cellar and I can recommend the exact bottle.";
+        }
+        if (/tonight|open|ready|drink now/.test(query)) {
+          return bottle
+            ? `Your best current option is the ${bottle.vintage} ${bottle.producer} ${bottle.wine}. Its drinking window is ${bottle.window}, and I would serve it ${bottle.service}.`
+            : "Your collection is empty, so I cannot choose a bottle yet. I can still help with a style or region if you tell me what is for dinner.";
+        }
+        if (/age|aging|hold|keep/.test(query)) {
+          return bottle
+            ? `The ${bottle.vintage} ${bottle.wine} is marked ${bottle.maturity.toLowerCase()}, with a researched window of ${bottle.window}. I would revisit it at the beginning of that window.`
+            : "Add a bottle and I will assess its vintage, region, producer, structure, and drinking window.";
+        }
+        if (/pair|food|cook|dinner/.test(query)) {
+          return "Tell me the main ingredient and preparation, such as roast duck, grilled salmon, mushroom risotto, or steak, and I will narrow the pairing.";
+        }
+        return bottle
+          ? `I currently see ${collectionTotal} bottle${collectionTotal === 1 ? "" : "s"} in your cellar. Ask me about pairing, serving, maturity, or whether to open the ${bottle.vintage} ${bottle.wine}.`
+          : "I can help with pairings, serving temperatures, regions, and aging. Your cellar is empty, so add a bottle for collection-specific advice.";
+      }
+
+      function sendSommelierMessage(text) {
+        const question = text.trim();
+        if (!question) return;
+        addSommelierMessage("user", question);
+        addSommelierMessage("assistant", sommelierReply(question));
+        sommelierInput.value = "";
+      }
+
+      sommelierForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        sendSommelierMessage(sommelierInput.value);
+      });
+      document.querySelectorAll("[data-sommelier-prompt]").forEach((button) => {
+        button.addEventListener("click", () => sendSommelierMessage(button.dataset.sommelierPrompt));
+      });
 
       const regionalCollection = {
         Burgundy: {}, Bordeaux: {}, Champagne: {}, Piedmont: {}, "Santa Cruz": {}
