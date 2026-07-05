@@ -1,0 +1,1367 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cellar</title>
+    <style>
+      :root {
+        --ink: #201715;
+        --night: #171211;
+        --cream: #f6efe1;
+        --paper: #fbf7ed;
+        --gold: #c7a25a;
+        --burgundy: #65142c;
+        --wine: #3b0c1b;
+        --oak: #8e6048;
+        --moss: #637456;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--cream);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .serif { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+      .shell {
+        min-height: 100vh;
+        padding: 16px;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(199, 162, 90, .2), transparent 30%),
+          linear-gradient(135deg, #fbf7ed 0%, #f2e5d0 48%, #d9bfa0 100%);
+      }
+      .topbar {
+        position: relative;
+        z-index: 20;
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px;
+        border: 1px solid rgba(255,255,255,.7);
+        border-radius: 8px;
+        background: rgba(255,255,255,.44);
+        box-shadow: 0 12px 36px rgba(63,41,35,.12);
+        backdrop-filter: blur(18px);
+      }
+      .brand { display: flex; align-items: center; gap: 12px; }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 6px;
+        background: var(--wine);
+        color: var(--cream);
+      }
+      .brand strong { display: block; font-size: 21px; line-height: 1; font-weight: 500; }
+      .brand span { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--oak); }
+      .add {
+        display: inline-block;
+        border: 0;
+        border-radius: 6px;
+        padding: 11px 16px;
+        background: var(--burgundy);
+        color: white;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .actions { display: flex; align-items: center; gap: 8px; }
+      .menu { position: relative; }
+      .menu summary {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 6px;
+        background: var(--ink);
+        color: var(--cream);
+        cursor: pointer;
+        list-style: none;
+      }
+      .menu summary::-webkit-details-marker { display: none; }
+      .menu summary span,
+      .menu summary:before,
+      .menu summary:after {
+        content: "";
+        display: block;
+        width: 18px;
+        height: 2px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+      .menu summary { gap: 4px; }
+      .menu nav {
+        position: absolute;
+        right: 0;
+        z-index: 5;
+        width: 270px;
+        margin-top: 12px;
+        padding: 8px;
+        border: 1px solid rgba(255,255,255,.72);
+        border-radius: 8px;
+        background: var(--paper);
+        box-shadow: 0 24px 70px rgba(32,23,21,.22);
+      }
+      .menu a {
+        display: block;
+        padding: 13px 12px;
+        border-radius: 6px;
+        color: var(--ink);
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .menu a:hover { background: white; }
+      .grid {
+        max-width: 1180px;
+        margin: 24px auto 0;
+        display: grid;
+        gap: 24px;
+        grid-template-columns: 1.08fr .92fr;
+      }
+      .hero {
+        min-height: 570px;
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+        padding: 32px;
+        color: var(--cream);
+        background:
+          radial-gradient(circle at 50% 10%, rgba(199, 162, 90, .24), transparent 24%),
+          linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+          linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+          var(--night);
+        background-size: auto, 44px 44px, 44px 44px;
+        box-shadow: 0 24px 70px rgba(32,23,21,.18);
+      }
+      .hero:before {
+        content: "";
+        position: absolute;
+        inset: 96px 32px 0;
+        border: 1px solid rgba(199,162,90,.18);
+        border-bottom: 0;
+        border-radius: 999px 999px 0 0;
+        background: linear-gradient(90deg, rgba(75,48,41,.42), rgba(23,18,17,.16), rgba(75,48,41,.42));
+      }
+      .hero:after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 150px;
+        background: linear-gradient(180deg, transparent, rgba(0,0,0,.5));
+      }
+      .hero > * { position: relative; z-index: 1; }
+      .hero h1 {
+        max-width: 680px;
+        margin: 70px 0 0;
+        color: white;
+        font-size: clamp(54px, 8vw, 88px);
+        line-height: .95;
+        font-weight: 500;
+      }
+      .hero p { max-width: 590px; color: rgba(246,239,225,.78); font-size: 18px; line-height: 1.7; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(199,162,90,.4);
+        border-radius: 6px;
+        padding: 9px 12px;
+        background: rgba(255,255,255,.08);
+        color: rgba(246,239,225,.88);
+      }
+      .stats { position: absolute; left: 32px; right: 32px; bottom: 32px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+      .stat { border-radius: 6px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.08); padding: 16px; }
+      .stat strong { display: block; color: white; font-size: 34px; font-family: Georgia, serif; font-weight: 500; }
+      .stat span { display: block; margin-top: 5px; color: rgba(246,239,225,.56); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+      .bottle {
+        position: absolute;
+        right: 46px;
+        bottom: 24px;
+        width: 150px;
+        height: 430px;
+        border-radius: 70px 70px 26px 26px;
+        background: linear-gradient(90deg, #070504, var(--wine), #070504);
+        box-shadow: 0 24px 70px rgba(0,0,0,.4);
+        z-index: 1;
+      }
+      .bottle:before {
+        content: "";
+        position: absolute;
+        left: 48px;
+        top: -82px;
+        width: 54px;
+        height: 100px;
+        border-radius: 30px 30px 0 0;
+        background: linear-gradient(90deg, #050303, var(--wine), #050303);
+      }
+      .label {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        top: 178px;
+        border-radius: 6px;
+        background: var(--paper);
+        color: var(--ink);
+        text-align: center;
+        padding: 16px 10px;
+      }
+      .label small { color: var(--burgundy); letter-spacing: .22em; text-transform: uppercase; }
+      .label b { display: block; margin-top: 8px; font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
+      .side { display: grid; gap: 24px; }
+      .panel {
+        border-radius: 8px;
+        padding: 24px;
+        background: rgba(251,247,237,.86);
+        box-shadow: 0 12px 36px rgba(63,41,35,.12);
+      }
+      .panel.dark { background: var(--wine); color: white; }
+      .eyebrow { margin: 0; color: var(--burgundy); font-size: 12px; letter-spacing: .18em; text-transform: uppercase; }
+      .panel.dark .eyebrow { color: var(--gold); }
+      h2 { margin: 8px 0 0; font-family: Georgia, serif; font-size: 34px; font-weight: 500; }
+      .panel p.copy { color: var(--oak); line-height: 1.7; }
+      .panel.dark p.copy { color: rgba(246,239,225,.78); }
+      .chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 18px; }
+      .chip { border-radius: 6px; background: rgba(255,255,255,.72); padding: 13px 8px; text-align: center; font-weight: 700; }
+      .panel.dark .chip { background: rgba(255,255,255,.1); color: white; }
+      button.chip { width: 100%; }
+      .location-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+        border-radius: 6px;
+        background: rgba(255,255,255,.72);
+        padding: 10px 12px;
+        font-weight: 700;
+      }
+      .location-field select {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: var(--ink);
+        font: inherit;
+        outline: none;
+      }
+      .location-search, .saved-location {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .location-input {
+        min-width: 0;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: var(--ink);
+        font: inherit;
+        outline: none;
+      }
+      button, .button { border: 0; font: inherit; cursor: pointer; }
+      .location-button, .icon-button {
+        border-radius: 6px;
+        background: var(--burgundy);
+        color: white;
+        padding: 0 15px;
+        font-weight: 700;
+      }
+      .icon-button {
+        width: 44px;
+        padding: 0;
+        background: rgba(255,255,255,.72);
+        color: var(--burgundy);
+        border: 1px solid rgba(142,96,72,.2);
+        font-size: 19px;
+      }
+      .location-status {
+        min-height: 16px;
+        margin: 8px 0 0;
+        color: var(--oak);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .weather-line {
+        display: inline-block;
+        margin-top: 10px;
+        border-radius: 6px;
+        background: #fbf2f4;
+        color: var(--wine);
+        padding: 9px 12px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .sections { max-width: 1180px; margin: 26px auto; display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); }
+      .card { border-radius: 8px; background: rgba(255,255,255,.78); padding: 16px; box-shadow: 0 12px 36px rgba(63,41,35,.12); }
+      .card-action {
+        width: 100%;
+        margin-top: 14px;
+        border-radius: 6px;
+        padding: 10px 12px;
+        background: var(--ink);
+        color: white;
+        font-weight: 700;
+      }
+      .collection {
+        max-width: 1180px;
+        margin: 30px auto;
+      }
+      .collection-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 18px;
+      }
+      .collection-head h2 { font-size: 44px; }
+      .collection-subtitle { margin: 8px 0 0; color: var(--oak); }
+      .collection-tools {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) 150px 150px;
+        gap: 8px;
+      }
+      .collection-tools input, .collection-tools select {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid rgba(142,96,72,.22);
+        border-radius: 6px;
+        background: rgba(255,255,255,.8);
+        color: var(--ink);
+        padding: 11px 12px;
+        font: inherit;
+        outline: none;
+      }
+      .collection-count { margin: 0 0 14px; color: var(--oak); font-size: 14px; font-weight: 700; }
+      .collection-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .wine-card {
+        overflow: hidden;
+        border: 1px solid rgba(142,96,72,.16);
+        border-radius: 8px;
+        background: rgba(255,255,255,.84);
+        box-shadow: 0 12px 36px rgba(63,41,35,.12);
+      }
+      .wine-card-cover {
+        position: relative;
+        height: 136px;
+        padding: 16px;
+        color: white;
+        background: linear-gradient(135deg, var(--burgundy), var(--night));
+      }
+      .wine-card-cover span { color: rgba(255,255,255,.7); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+      .wine-card-cover strong { display: block; margin-top: 10px; font: 500 38px Georgia, serif; }
+      .wine-card-score {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        border-radius: 6px;
+        background: rgba(255,255,255,.9);
+        color: var(--ink);
+        padding: 6px 8px;
+        font-weight: 800;
+      }
+      .wine-card-body { padding: 18px; }
+      .wine-card-producer { color: var(--burgundy); font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+      .wine-card h3 { margin: 7px 0 0; font: 500 25px/1.15 Georgia, serif; }
+      .wine-card-meta, .wine-card-note { color: var(--oak); font-size: 14px; line-height: 1.55; }
+      .wine-card-note { min-height: 66px; }
+      .wine-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 14px;
+        padding: 14px 0;
+        border-top: 1px solid rgba(142,96,72,.15);
+        border-bottom: 1px solid rgba(142,96,72,.15);
+      }
+      .wine-details small { display: block; color: var(--oak); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+      .wine-details b { display: block; margin-top: 3px; font-size: 13px; }
+      .wine-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+      .wine-card-foot p { margin: 0; color: var(--oak); font-size: 12px; }
+      .wine-card-actions { display: flex; gap: 7px; flex: 0 0 auto; }
+      .wine-card-actions button {
+        flex: 0 0 auto;
+        border-radius: 6px;
+        background: var(--ink);
+        color: white;
+        padding: 10px 12px;
+        font-weight: 700;
+      }
+      .wine-card-actions .delete-bottle {
+        padding: 10px;
+        border: 1px solid rgba(101,20,44,.28);
+        background: transparent;
+        color: var(--burgundy);
+        font-size: 12px;
+      }
+      .wine-card-actions .delete-bottle:hover { background: var(--burgundy); color: white; }
+      .collection-empty { grid-column: 1 / -1; border: 1px dashed rgba(142,96,72,.35); border-radius: 8px; padding: 40px; text-align: center; color: var(--oak); }
+      .winepic { height: 190px; border-radius: 6px; background: linear-gradient(135deg, var(--burgundy), var(--wine)); display: grid; place-items: center; color: white; }
+      .winepic span { border: 1px solid rgba(255,255,255,.35); padding: 50px 20px 20px; border-radius: 50px 50px 12px 12px; background: rgba(0,0,0,.22); }
+      .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+      .metric { border-radius: 6px; background: var(--paper); padding: 10px; }
+      .metric strong { display: block; }
+      .metric span { color: var(--oak); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+      .wide {
+        max-width: 1180px;
+        margin: 0 auto 32px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .overview {
+        max-width: 1180px;
+        margin: 26px auto;
+      }
+      .overview-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+      .overview-head h2 { font-size: 42px; }
+      .browse {
+        border: 0;
+        border-radius: 6px;
+        padding: 11px 16px;
+        background: var(--ink);
+        color: var(--cream);
+        font-weight: 700;
+      }
+      .overview-grid {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 18px;
+      }
+      .overview-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .overview-zones {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .mini {
+        border-radius: 6px;
+        background: var(--paper);
+        padding: 14px;
+      }
+      .mini strong {
+        display: block;
+        font-family: Georgia, serif;
+        font-size: 28px;
+        font-weight: 500;
+      }
+      .mini span {
+        display: block;
+        margin-top: 4px;
+        color: var(--oak);
+        font-size: 11px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+      }
+      .zone {
+        border: 1px solid rgba(142,96,72,.18);
+        border-radius: 6px;
+        background: rgba(255,255,255,.72);
+        padding: 14px;
+      }
+      .zone h3 {
+        margin: 0;
+        font-family: Georgia, serif;
+        font-size: 24px;
+        font-weight: 500;
+      }
+      .zone strong { display: block; margin-top: 9px; color: var(--burgundy); }
+      .zone p { color: var(--oak); line-height: 1.55; }
+      .pulse-item {
+        border-radius: 6px;
+        background: rgba(255,255,255,.08);
+        padding: 13px;
+        margin-top: 10px;
+      }
+      .pulse-item strong { display: block; color: white; }
+      .pulse-item span { display: block; margin-top: 4px; color: rgba(246,239,225,.68); font-size: 14px; }
+      .recognition { display: grid; grid-template-columns: 190px 1fr; gap: 14px; margin-top: 18px; }
+      .scan { border: 1px dashed #d48998; border-radius: 8px; padding: 20px; text-align: center; background: rgba(255,255,255,.6); }
+      .rows { display: grid; gap: 8px; }
+      .row { display: flex; justify-content: space-between; gap: 12px; border-radius: 6px; background: rgba(255,255,255,.76); padding: 12px; }
+      .capture-grid {
+        display: grid;
+        grid-template-columns: minmax(240px, .9fr) 1fr;
+        gap: 14px;
+        margin-top: 18px;
+      }
+      .dropzone {
+        border: 1px dashed #d48998;
+        border-radius: 8px;
+        background: rgba(255,255,255,.62);
+        padding: 14px;
+        text-align: center;
+      }
+      .dropzone.dragging { background: white; border-color: var(--burgundy); }
+      .photo-stage {
+        display: flex;
+        min-height: 260px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        background: rgba(251,247,237,.82);
+        padding: 16px;
+      }
+      .photo-stage img {
+        display: none;
+        max-height: 230px;
+        width: 100%;
+        border-radius: 6px;
+        object-fit: cover;
+        box-shadow: 0 12px 36px rgba(63,41,35,.16);
+      }
+      .photo-icon {
+        display: grid;
+        place-items: center;
+        width: 86px;
+        height: 86px;
+        border-radius: 999px;
+        background: #fbf2f4;
+        color: var(--burgundy);
+        font-size: 34px;
+      }
+      .file-name {
+        margin: 12px 0 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+      }
+      .capture-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .capture-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 6px;
+        padding: 12px;
+        background: var(--burgundy);
+        color: white;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      .capture-action.camera { background: var(--ink); }
+      .capture-action input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; pointer-events: none; }
+      .recognition-status {
+        border-radius: 6px;
+        background: #fbf2f4;
+        color: var(--wine);
+        padding: 12px;
+        font-weight: 700;
+      }
+      .scan-purpose {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        margin-top: 16px;
+        border-radius: 6px;
+        background: var(--cream);
+        padding: 4px;
+      }
+      .scan-choice {
+        border-radius: 6px;
+        background: transparent;
+        color: var(--oak);
+        padding: 11px;
+        font-weight: 700;
+      }
+      .scan-choice.active { background: var(--burgundy); color: white; box-shadow: 0 8px 20px rgba(63,41,35,.14); }
+      .scan-choice[data-intent="checking"].active { background: var(--ink); }
+      .identify-action {
+        width: 100%;
+        border-radius: 6px;
+        background: var(--burgundy);
+        color: white;
+        padding: 13px;
+        font-weight: 800;
+      }
+      .identify-action:disabled { cursor: not-allowed; opacity: .42; }
+      .map {
+        position: relative;
+        min-height: 230px;
+        border-radius: 8px;
+        background: radial-gradient(circle at 44% 45%, rgba(199,162,90,.4), transparent 18%), radial-gradient(circle at 58% 38%, rgba(143,29,58,.56), transparent 14%), linear-gradient(135deg,#293532,#111);
+      }
+      .map-node {
+        position: absolute;
+        border-radius: 999px;
+        background: var(--gold);
+        color: var(--ink);
+        padding: 7px 9px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .map-node.active { background: white; color: var(--burgundy); outline: 2px solid var(--gold); }
+      .map-detail {
+        margin-top: 12px;
+        border: 1px solid rgba(199,162,90,.25);
+        border-radius: 6px;
+        background: rgba(255,255,255,.08);
+        padding: 14px;
+      }
+      .map-detail h3 { margin: 6px 0 0; font: 500 28px Georgia, serif; }
+      .map-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+      .map-stats small { display: block; color: rgba(246,239,225,.56); }
+      .map-stats strong { display: block; margin-top: 3px; color: white; }
+      .map-producer { color: rgba(246,239,225,.68); font-size: 13px; }
+      .clickable-panel {
+        display: block;
+        width: 100%;
+        text-align: left;
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform .18s ease, box-shadow .18s ease;
+      }
+      .clickable-panel:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 24px 70px rgba(32,23,21,.18);
+      }
+      .open-link {
+        display: inline-block;
+        margin-top: 14px;
+        border-radius: 6px;
+        background: var(--gold);
+        color: var(--ink);
+        padding: 10px 14px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: none;
+        place-items: center;
+        padding: 16px;
+        background: rgba(23,18,17,.72);
+        backdrop-filter: blur(8px);
+      }
+      .modal.open { display: grid; }
+      .modal-card {
+        width: min(100%, 520px);
+        border-radius: 8px;
+        background: var(--paper);
+        padding: 24px;
+        box-shadow: 0 24px 70px rgba(0,0,0,.34);
+      }
+      .modal-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
+      .modal-close {
+        flex: 0 0 auto;
+        width: 42px;
+        height: 42px;
+        border-radius: 6px;
+        background: var(--ink);
+        color: white;
+        font-size: 20px;
+      }
+      .modal-copy { color: var(--oak); line-height: 1.7; }
+      .modal-done {
+        width: 100%;
+        border-radius: 6px;
+        padding: 12px;
+        background: var(--burgundy);
+        color: white;
+        font-weight: 700;
+      }
+      .modal-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 18px; }
+      .modal-cancel {
+        display: none;
+        border: 1px solid rgba(142,96,72,.3);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--ink);
+        padding: 12px;
+        font-weight: 700;
+      }
+      .modal.delete-mode .modal-actions { grid-template-columns: 1fr 1fr; }
+      .modal.delete-mode .modal-cancel { display: block; }
+      .shelves {
+        position: absolute;
+        top: 122px;
+        bottom: 128px;
+        width: 118px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        opacity: .72;
+      }
+      .shelves.left { left: 28px; }
+      .shelves.right { right: 28px; }
+      .shelf {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        padding: 8px;
+        border: 1px solid rgba(199,162,90,.12);
+        border-radius: 6px;
+        background: rgba(75,48,41,.38);
+      }
+      .shelf span {
+        height: 20px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #050303, var(--wine), #050303);
+      }
+
+      @media (max-width: 920px) {
+        .grid, .sections, .wide, .overview-grid, .overview-zones { grid-template-columns: 1fr; }
+        .collection-head { align-items: start; flex-direction: column; }
+        .collection-tools { width: 100%; }
+        .collection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .bottle, .shelves { display: none; }
+        .hero { min-height: 650px; }
+        .stats, .overview-stats { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 560px) {
+        .topbar { align-items: flex-start; }
+        .brand strong { font-size: 18px; }
+        .add { display: none; }
+        .hero { padding: 22px; }
+        .hero h1 { margin-top: 44px; font-size: 50px; }
+        .stats { left: 22px; right: 22px; bottom: 22px; }
+        .recognition, .capture-grid { grid-template-columns: 1fr; }
+        .overview-head { align-items: start; flex-direction: column; }
+        .collection-tools, .collection-grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">V</div>
+          <div><strong class="serif">Cellar</strong><span>Private collection</span></div>
+        </div>
+        <div class="actions">
+          <a class="add" href="#add-bottle">Add Bottle</a>
+          <details class="menu">
+            <summary aria-label="Open menu"><span></span></summary>
+            <nav>
+              <a href="#my-collection">My Bottles</a>
+              <a href="#collection-overview">Full Collection Overview</a>
+              <a href="#dashboard">Overall Collection</a>
+              <a href="#regional-map">Regional Map</a>
+              <a href="#sommelier">AI Sommelier</a>
+            </nav>
+          </details>
+        </div>
+      </header>
+
+      <div class="grid">
+        <section class="hero">
+          <div class="shelves left">
+            <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          </div>
+          <div class="shelves right">
+            <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          </div>
+          <span class="pill">Entering the west cellar</span>
+          <h1 class="serif">Step inside your private collection.</h1>
+          <p>Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which vintage deserves the table tonight.</p>
+          <div class="bottle"><div class="label"><small>Grand Cru</small><b>Cellar</b><p>AI Selected</p><b>2018</b></div></div>
+          <div class="stats">
+            <div class="stat"><strong>742</strong><span>Bottles</span></div>
+            <div class="stat"><strong>96</strong><span>Ready now</span></div>
+            <div class="stat"><strong>214</strong><span>Resting</span></div>
+            <div class="stat"><strong>14</strong><span>Regions</span></div>
+          </div>
+        </section>
+
+        <aside class="side">
+          <section class="panel">
+            <p class="eyebrow">Tonight</p>
+            <h2 id="tonight-bottle">Open the 2017 Barolo</h2>
+            <div class="location-search">
+              <label class="location-field" style="margin-top:0">
+                <input class="location-input" id="location-query" type="text" placeholder="City or postcode" aria-label="Type a city or postcode" />
+              </label>
+              <button class="location-button" id="search-location">Use</button>
+            </div>
+            <div class="saved-location">
+              <label class="location-field" style="margin-top:0">
+                <select id="location-picker" aria-label="Saved location">
+                  <option value="paris">Paris, France</option>
+                  <option value="newYork">New York, USA</option>
+                  <option value="sanFrancisco">San Francisco, USA</option>
+                  <option value="london">London, UK</option>
+                </select>
+              </label>
+              <button class="icon-button" id="device-location" aria-label="Use my current location" title="Use my current location">◎</button>
+            </div>
+            <p class="location-status" id="location-status" role="status"></p>
+            <div class="weather-line" id="tonight-weather">18 C / cool evening</div>
+            <p class="copy" id="tonight-reason">It is entering peak, you own three bottles, and cool Paris weather favors braised short rib, porcini risotto, or aged Comte.</p>
+            <div class="chips"><div class="chip" id="tonight-temp">18 C</div><div class="chip" id="tonight-decant">45 min</div><div class="chip" id="tonight-window">2026-2034</div></div>
+          </section>
+          <section class="panel dark" id="sommelier">
+            <p class="eyebrow">AI Sommelier</p>
+            <h2>Warm, expert, never pretentious.</h2>
+            <p class="copy">For duck tonight, choose the 2018 Clos Saint-Jacques if you want perfume and silk. Keep the 2016 Leoville Las Cases asleep.</p>
+            <div class="chips">
+              <button class="chip" data-action="Ask the AI Sommelier" data-copy="Ask what to open, what to hold, or what works with tonight's meal. The sommelier considers your collection, maturity, weather, and how many bottles remain.">Ask</button>
+              <button class="chip" data-action="Food pairing" data-copy="Tell the sommelier what you are cooking and it will choose mature bottles from your cellar, with serving and decanting guidance.">Pair</button>
+              <button class="chip" data-action="Compare vintages" data-copy="Choose two or more vintages to compare structure, maturity, weather, drinking windows, and style in plain English.">Compare</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <section class="overview" id="collection-overview">
+        <div class="overview-head">
+          <div>
+            <p class="eyebrow">Full collection overview</p>
+            <h2>Your cellar at a glance</h2>
+          </div>
+          <a class="browse" href="#my-collection" style="text-decoration:none">Browse cellar</a>
+        </div>
+        <div class="overview-grid">
+          <div class="panel">
+            <div class="overview-stats">
+              <div class="mini"><strong>742</strong><span>Total bottles</span></div>
+              <div class="mini"><strong>318</strong><span>Red</span></div>
+              <div class="mini"><strong>186</strong><span>White</span></div>
+              <div class="mini"><strong>42</strong><span>Sparkling</span></div>
+            </div>
+            <div class="overview-zones">
+              <article class="zone"><h3>West cellar</h3><strong>384 bottles</strong><p>Burgundy, Bordeaux, Piedmont</p></article>
+              <article class="zone"><h3>Wine fridge</h3><strong>126 bottles</strong><p>Champagne, Riesling, Chardonnay</p></article>
+              <article class="zone"><h3>Offsite storage</h3><strong>232 bottles</strong><p>Long-aging reserves</p></article>
+            </div>
+          </div>
+          <div class="panel dark">
+            <p class="eyebrow">Collection pulse</p>
+            <h2>What is happening now</h2>
+            <div class="pulse-item"><strong>Ready to open</strong><span>96 bottles are in their recommended window</span></div>
+            <div class="pulse-item"><strong>Entering peak</strong><span>18 bottles should be revisited this year</span></div>
+            <div class="pulse-item"><strong>Needs attention</strong><span>7 bottles are past the ideal drinking range</span></div>
+            <div class="pulse-item"><strong>Most represented</strong><span>Burgundy leads with 221 bottles</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wide" id="dashboard">
+        <div class="panel" id="add-bottle">
+          <p class="eyebrow">Add Bottle</p>
+          <h2>AI Bottle Recognition</h2>
+          <div class="scan-purpose" aria-label="Bottle scan purpose">
+            <button class="scan-choice active" data-intent="collection" aria-pressed="true">Add to my collection</button>
+            <button class="scan-choice" data-intent="checking" aria-pressed="false">Just checking</button>
+          </div>
+          <div class="capture-grid">
+            <div class="dropzone" id="bottle-dropzone">
+              <div class="photo-stage">
+                <img id="bottle-preview" alt="Selected bottle photo" />
+                <div id="photo-empty">
+                  <div class="photo-icon">+</div>
+                  <p><strong>Drop a bottle or label photo</strong></p>
+                  <p>Front label, back label, or full bottle</p>
+                </div>
+              </div>
+              <p class="file-name" id="bottle-file-name">No bottle photo selected</p>
+              <div class="capture-actions">
+                <label class="capture-action">
+                  Upload
+                  <input id="bottle-upload" type="file" accept="image/*" />
+                </label>
+                <label class="capture-action camera">
+                  Camera
+                  <input id="bottle-camera" type="file" accept="image/*" capture="environment" />
+                </label>
+              </div>
+            </div>
+            <div class="rows">
+              <div class="recognition-status" id="recognition-status">Upload or take a photo to identify the bottle</div>
+              <div class="row"><span>Producer</span><strong>Domaine Leflaive</strong></div>
+              <div class="row"><span>Wine</span><strong>Puligny-Montrachet Les Pucelles</strong></div>
+              <div class="row"><span>Vintage</span><strong>2020</strong></div>
+              <div class="row"><span>Style</span><strong>Cellar-worthy Chardonnay</strong></div>
+              <button class="identify-action" id="identify-action" disabled>Identify and add bottle</button>
+            </div>
+          </div>
+        </div>
+        <section class="panel dark" id="regional-map">
+          <p class="eyebrow">Collection geography</p>
+          <h2>Regional Map</h2>
+          <div class="map" id="map-plot">
+            <button class="map-node active" data-region="Burgundy" style="left:16%;top:24%">Burgundy</button>
+            <button class="map-node" data-region="Bordeaux" style="left:48%;top:21%">Bordeaux</button>
+            <button class="map-node" data-region="Champagne" style="left:63%;top:44%">Champagne</button>
+            <button class="map-node" data-region="Piedmont" style="left:28%;top:62%">Piedmont</button>
+            <button class="map-node" data-region="Santa Cruz" style="left:58%;top:70%">Santa Cruz</button>
+          </div>
+          <div class="map-detail">
+            <p class="eyebrow">Selected region</p>
+            <h3 id="map-region-name">Burgundy</h3>
+            <div class="map-stats">
+              <div><small>Bottles</small><strong id="map-bottles">221</strong></div>
+              <div><small>Ready now</small><strong id="map-ready">43</strong></div>
+              <div><small>Average score</small><strong id="map-score">95.1</strong></div>
+              <div><small>Collection value</small><strong id="map-value">$182,400</strong></div>
+            </div>
+            <p class="map-producer">Most owned: <span id="map-producer">Domaine Armand Rousseau</span></p>
+          </div>
+          <button class="open-link" id="view-region-bottles">View Burgundy bottles</button>
+        </section>
+      </section>
+
+      <section class="collection" id="my-collection">
+        <div class="collection-head">
+          <div>
+            <p class="eyebrow">My bottles / <span id="collection-total">742</span> total</p>
+            <h2>Your complete collection</h2>
+            <p class="collection-subtitle">Detailed cards for every vintage, bottle, and storage location.</p>
+          </div>
+          <div class="collection-tools">
+            <input id="collection-search" type="search" placeholder="Search bottles" aria-label="Search collection" />
+            <select id="collection-region" aria-label="Filter by region">
+              <option>All regions</option>
+              <option>Burgundy</option>
+              <option>Bordeaux</option>
+              <option>Champagne</option>
+              <option>Piedmont</option>
+              <option>Santa Cruz</option>
+            </select>
+            <select id="collection-sort" aria-label="Sort collection">
+              <option value="producer">Producer A-Z</option>
+              <option value="score">Highest score</option>
+              <option value="vintage">Newest vintage</option>
+            </select>
+          </div>
+        </div>
+        <p class="collection-count" id="collection-count"></p>
+        <div class="collection-grid" id="collection-grid"></div>
+      </section>
+    </main>
+    <div class="modal" id="action-modal" aria-hidden="true">
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-head">
+          <div><p class="eyebrow">Cellar</p><h2 id="modal-title">Details</h2></div>
+          <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+        </div>
+        <p class="modal-copy" id="modal-copy"></p>
+        <div class="modal-actions">
+          <button class="modal-cancel" id="modal-cancel">Cancel</button>
+          <button class="modal-done" id="modal-done">Done</button>
+        </div>
+      </section>
+    </div>
+    <script>
+      const dropzone = document.getElementById("bottle-dropzone");
+      const uploadInput = document.getElementById("bottle-upload");
+      const cameraInput = document.getElementById("bottle-camera");
+      const previewImage = document.getElementById("bottle-preview");
+      const emptyPhoto = document.getElementById("photo-empty");
+      const fileName = document.getElementById("bottle-file-name");
+      const recognitionStatus = document.getElementById("recognition-status");
+      const scanChoices = document.querySelectorAll(".scan-choice");
+      const identifyAction = document.getElementById("identify-action");
+      let bottleIntent = "collection";
+      let bottlePhotoReady = false;
+
+      function updateBottleIntent() {
+        scanChoices.forEach((choice) => {
+          const active = choice.dataset.intent === bottleIntent;
+          choice.classList.toggle("active", active);
+          choice.setAttribute("aria-pressed", String(active));
+        });
+        identifyAction.textContent = bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving";
+        if (bottlePhotoReady) {
+          recognitionStatus.textContent = bottleIntent === "collection"
+            ? "Ready to identify and add to your collection"
+            : "Ready to identify without saving";
+        }
+      }
+
+      function handleBottleFile(file) {
+        if (!file) return;
+        bottlePhotoReady = true;
+        fileName.textContent = file.name;
+        previewImage.src = URL.createObjectURL(file);
+        previewImage.style.display = "block";
+        emptyPhoto.style.display = "none";
+        identifyAction.disabled = false;
+        updateBottleIntent();
+      }
+
+      scanChoices.forEach((choice) => {
+        choice.addEventListener("click", () => {
+          bottleIntent = choice.dataset.intent;
+          updateBottleIntent();
+        });
+      });
+      identifyAction.addEventListener("click", () => {
+        if (!bottlePhotoReady) return;
+        openActionModal(
+          bottleIntent === "collection" ? "Bottle added to your collection" : "Wine identified, not saved",
+          bottleIntent === "collection"
+            ? "The 2020 Domaine Leflaive Puligny-Montrachet Les Pucelles has been added. You can now set quantity, purchase details, and storage position."
+            : "This was a private lookup only. The wine and photo were not added to your collection."
+        );
+      });
+
+      uploadInput.addEventListener("change", () => handleBottleFile(uploadInput.files[0]));
+      cameraInput.addEventListener("change", () => handleBottleFile(cameraInput.files[0]));
+      dropzone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropzone.classList.add("dragging");
+      });
+      dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragging"));
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("dragging");
+        handleBottleFile(event.dataTransfer.files[0]);
+      });
+
+      const locationProfiles = {
+        paris: {
+          weather: "18 C / cool evening",
+          bottle: "Open the 2017 Barolo",
+          reason: "It is entering peak, you own three bottles, and cool Paris weather favors braised short rib, porcini risotto, or aged Comte.",
+          service: ["18 C", "45 min", "2026-2034"]
+        },
+        newYork: {
+          weather: "26 C / humid",
+          bottle: "Open the 2020 Puligny-Montrachet",
+          reason: "It is entering peak, you own three bottles, and a warmer, humid night calls for something lifted and precise with roast chicken, grilled corn, or lemony seafood.",
+          service: ["11 C", "0 min", "2025-2030"]
+        },
+        sanFrancisco: {
+          weather: "15 C / foggy",
+          bottle: "Open the 2018 Clos Saint-Jacques",
+          reason: "It is entering peak, you own three bottles, and the foggy evening suits aromatic Burgundy with duck, mushrooms, salmon, or a simple roast bird.",
+          service: ["16 C", "30 min", "2028-2038"]
+        },
+        london: {
+          weather: "14 C / rainy",
+          bottle: "Open the 2016 Saint-Julien half bottle",
+          reason: "It is entering peak, you own three bottles, and a rainy evening makes structured Bordeaux feel right with lamb, lentils, or a savory pie.",
+          service: ["17 C", "60 min", "2027-2042"]
+        }
+      };
+
+      const picker = document.getElementById("location-picker");
+      const locationQuery = document.getElementById("location-query");
+      const searchLocationButton = document.getElementById("search-location");
+      const deviceLocationButton = document.getElementById("device-location");
+      const locationStatus = document.getElementById("location-status");
+      const bottle = document.getElementById("tonight-bottle");
+      const weather = document.getElementById("tonight-weather");
+      const reason = document.getElementById("tonight-reason");
+      const temp = document.getElementById("tonight-temp");
+      const decant = document.getElementById("tonight-decant");
+      const windowLabel = document.getElementById("tonight-window");
+
+      function showProfile(profile) {
+        bottle.textContent = profile.bottle;
+        weather.textContent = profile.weather;
+        reason.textContent = profile.reason;
+        temp.textContent = profile.service[0];
+        decant.textContent = profile.service[1];
+        windowLabel.textContent = profile.service[2];
+      }
+
+      const weatherDescriptions = {
+        0: "clear", 1: "mostly clear", 2: "partly cloudy", 3: "overcast",
+        45: "foggy", 48: "foggy", 51: "light drizzle", 53: "drizzly",
+        55: "rainy", 61: "light rain", 63: "rainy", 65: "heavy rain",
+        71: "light snow", 73: "snowy", 75: "heavy snow", 80: "rain showers",
+        81: "rain showers", 82: "heavy showers", 95: "thunderstorms"
+      };
+
+      function profileForWeather(label, temperature, code) {
+        const condition = weatherDescriptions[code] || "settled";
+        const rounded = Math.round(temperature);
+        if (temperature >= 23) {
+          return {
+            weather: `${rounded} C / ${condition}`,
+            bottle: "Open the 2020 Puligny-Montrachet",
+            reason: `Using live weather for ${label}: the ${condition}, ${rounded} C conditions call for something lifted and precise with seafood, roast chicken, or summer vegetables.`,
+            service: ["11 C", "0 min", "2025-2030"]
+          };
+        }
+        if (temperature <= 10 || code >= 51) {
+          return {
+            weather: `${rounded} C / ${condition}`,
+            bottle: "Open the 2016 Saint-Julien half bottle",
+            reason: `Using live weather for ${label}: the ${condition}, ${rounded} C conditions suit structured Bordeaux with lamb, lentils, or a savory pie.`,
+            service: ["17 C", "60 min", "2027-2042"]
+          };
+        }
+        return {
+          weather: `${rounded} C / ${condition}`,
+          bottle: "Open the 2018 Clos Saint-Jacques",
+          reason: `Using live weather for ${label}: the ${condition}, ${rounded} C evening suits aromatic Burgundy with duck, mushrooms, salmon, or roast chicken.`,
+          service: ["16 C", "30 min", "2028-2038"]
+        };
+      }
+
+      async function loadWeather(latitude, longitude, label) {
+        locationStatus.textContent = "Checking local conditions...";
+        try {
+          const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`);
+          if (!response.ok) throw new Error("Weather unavailable");
+          const data = await response.json();
+          showProfile(profileForWeather(label, data.current.temperature_2m, data.current.weather_code));
+          locationStatus.textContent = `Using live weather for ${label}`;
+        } catch (error) {
+          locationStatus.textContent = "Live weather could not be loaded. Try again.";
+        }
+      }
+
+      async function searchLocation() {
+        const query = locationQuery.value.trim();
+        if (!query) {
+          locationStatus.textContent = "Type a city or postcode first.";
+          return;
+        }
+        locationStatus.textContent = "Finding that location...";
+        try {
+          const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
+          if (!response.ok) throw new Error("Location unavailable");
+          const data = await response.json();
+          const result = data.results && data.results[0];
+          if (!result) {
+            locationStatus.textContent = "No matching location found.";
+            return;
+          }
+          const label = [...new Set([result.name, result.admin1, result.country].filter(Boolean))].join(", ");
+          await loadWeather(result.latitude, result.longitude, label);
+        } catch (error) {
+          locationStatus.textContent = "That location could not be loaded. Try another.";
+        }
+      }
+
+      picker.addEventListener("change", () => {
+        showProfile(locationProfiles[picker.value]);
+        locationStatus.textContent = "";
+      });
+      searchLocationButton.addEventListener("click", searchLocation);
+      locationQuery.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") searchLocation();
+      });
+      deviceLocationButton.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          locationStatus.textContent = "Location services are not available on this device.";
+          return;
+        }
+        locationStatus.textContent = "Waiting for location permission...";
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            loadWeather(latitude, longitude, `current location (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`);
+          },
+          () => {
+            locationStatus.textContent = "Location access was not granted. You can type a city instead.";
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+        );
+      });
+
+      const collectionBottles = [
+        { producer: "Domaine Armand Rousseau", wine: "Gevrey-Chambertin Clos Saint-Jacques", vintage: "2018", region: "Burgundy, France", appellation: "Gevrey-Chambertin Premier Cru", classification: "Premier Cru", grapes: "100% Pinot Noir", score: 97, maturity: "Approaching peak", window: "2028-2040", quantity: "6 bottles", storage: "Rack A / Shelf 3", service: "16 C / 30 min", purchase: "$425", market: "$790", color: "linear-gradient(135deg,#65142c,#4b3029)", note: "Perfumed red cherry, rose, fine spice, and mineral length with beautifully resolved tannins." },
+        { producer: "Chateau Leoville Las Cases", wine: "Saint-Julien Grand Vin", vintage: "2016", region: "Bordeaux, France", appellation: "Saint-Julien", classification: "Second Growth", grapes: "Cabernet Sauvignon blend", score: 98, maturity: "Needs aging", window: "2030-2060", quantity: "12 bottles", storage: "Oak wall / Bin 12", service: "17 C / 120 min", purchase: "$185", market: "$315", color: "linear-gradient(135deg,#201715,#3b0c1b)", note: "Cassis, graphite, cedar, and tobacco with immense structure and a long, precise finish." },
+        { producer: "Ridge Vineyards", wine: "Monte Bello Cabernet Sauvignon", vintage: "2019", region: "Santa Cruz Mountains, USA", appellation: "Santa Cruz Mountains", classification: "Estate wine", grapes: "Cabernet Sauvignon blend", score: 96, maturity: "Wait 5 years", window: "2032-2065", quantity: "4 bottles", storage: "Fridge 2 / Shelf 4", service: "17 C / 90 min", purchase: "$230", market: "$295", color: "linear-gradient(135deg,#637456,#4e5b5b)", note: "Mountain cassis, mint, crushed stone, and savory herbs framed by fresh acidity." },
+        { producer: "Domaine Leflaive", wine: "Puligny-Montrachet Les Pucelles", vintage: "2020", region: "Burgundy, France", appellation: "Puligny-Montrachet Premier Cru", classification: "Premier Cru", grapes: "100% Chardonnay", score: 96, maturity: "Approaching peak", window: "2027-2042", quantity: "3 bottles", storage: "Wine fridge / Shelf 2", service: "12 C / no decant", purchase: "$510", market: "$720", color: "linear-gradient(135deg,#a48b55,#596659)", note: "White flowers, citrus oil, hazelnut, and chalk with layered texture and electric freshness." },
+        { producer: "Giacomo Conterno", wine: "Barolo Monfortino Riserva", vintage: "2013", region: "Piedmont, Italy", appellation: "Barolo DOCG", classification: "Riserva", grapes: "100% Nebbiolo", score: 99, maturity: "Entering peak", window: "2026-2055", quantity: "2 bottles", storage: "West cellar / Bin 7", service: "18 C / 180 min", purchase: "$680", market: "$1,290", color: "linear-gradient(135deg,#7a2832,#34211d)", note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity." },
+        { producer: "Krug", wine: "Grande Cuvee 170eme Edition", vintage: "MV", region: "Champagne, France", appellation: "Champagne", classification: "Grande Cuvee", grapes: "Pinot Noir, Chardonnay, Meunier", score: 97, maturity: "Peak drinking", window: "2024-2040", quantity: "5 bottles", storage: "Wine fridge / Shelf 1", service: "10 C / no decant", purchase: "$195", market: "$255", color: "linear-gradient(135deg,#c2a96f,#4a4d43)", note: "Toasted brioche, citrus, almond, and orchard fruit with extraordinary depth and fine mousse." }
+      ];
+      const collectionSearch = document.getElementById("collection-search");
+      const collectionRegion = document.getElementById("collection-region");
+      const collectionSort = document.getElementById("collection-sort");
+      const collectionGrid = document.getElementById("collection-grid");
+      const collectionCount = document.getElementById("collection-count");
+      const collectionTotalLabel = document.getElementById("collection-total");
+      let collectionTotal = 742;
+
+      function renderCollection() {
+        const query = collectionSearch.value.trim().toLowerCase();
+        const region = collectionRegion.value;
+        const sort = collectionSort.value;
+        const visible = collectionBottles
+          .filter((wine) => region === "All regions" || wine.region.includes(region))
+          .filter((wine) => `${wine.producer} ${wine.wine} ${wine.vintage} ${wine.region} ${wine.grapes}`.toLowerCase().includes(query))
+          .sort((a, b) => sort === "score" ? b.score - a.score : sort === "vintage" ? String(b.vintage).localeCompare(String(a.vintage)) : a.producer.localeCompare(b.producer));
+
+        collectionCount.textContent = `${visible.length} collection cards shown`;
+        if (!visible.length) {
+          collectionGrid.innerHTML = '<div class="collection-empty">No bottles match those filters.</div>';
+          return;
+        }
+        collectionGrid.innerHTML = visible.map((wine) => `
+          <article class="wine-card">
+            <div class="wine-card-cover" style="background:${wine.color}">
+              <span>${wine.region}</span>
+              <strong>${wine.vintage}</strong>
+              <b class="wine-card-score">${wine.score} pts</b>
+            </div>
+            <div class="wine-card-body">
+              <div class="wine-card-producer">${wine.producer}</div>
+              <h3>${wine.wine}</h3>
+              <p class="wine-card-meta">${wine.appellation} / ${wine.classification}</p>
+              <p class="wine-card-note">${wine.note}</p>
+              <div class="wine-details">
+                <div><small>Grapes</small><b>${wine.grapes}</b></div>
+                <div><small>Maturity</small><b>${wine.maturity}</b></div>
+                <div><small>Drink</small><b>${wine.window}</b></div>
+                <div><small>Quantity</small><b>${wine.quantity}</b></div>
+                <div><small>Storage</small><b>${wine.storage}</b></div>
+                <div><small>Service</small><b>${wine.service}</b></div>
+              </div>
+              <div class="wine-card-foot">
+                <p>Purchased ${wine.purchase}<br>Current ${wine.market}</p>
+                <div class="wine-card-actions">
+                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}.">Full details</button>
+                  <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        `).join("");
+        collectionGrid.querySelectorAll("[data-action]").forEach((control) => {
+          control.addEventListener("click", () => openActionModal(control.dataset.action, control.dataset.copy));
+          control.dataset.bound = "true";
+        });
+        collectionGrid.querySelectorAll("[data-delete-key]").forEach((control) => {
+          control.addEventListener("click", () => openDeleteModal(control.dataset.deleteKey, control.dataset.deleteTitle, control.dataset.deleteCopy));
+        });
+      }
+
+      collectionSearch.addEventListener("input", renderCollection);
+      collectionRegion.addEventListener("change", renderCollection);
+      collectionSort.addEventListener("change", renderCollection);
+
+      const regionalCollection = {
+        Burgundy: { bottles: 221, ready: 43, score: "95.1", producer: "Domaine Armand Rousseau", value: "$182,400" },
+        Bordeaux: { bottles: 146, ready: 28, score: "94.6", producer: "Chateau Leoville Las Cases", value: "$96,800" },
+        Champagne: { bottles: 64, ready: 31, score: "94.8", producer: "Krug", value: "$31,200" },
+        Piedmont: { bottles: 52, ready: 14, score: "95.4", producer: "Giacomo Conterno", value: "$42,700" },
+        "Santa Cruz": { bottles: 38, ready: 9, score: "94.2", producer: "Ridge Vineyards", value: "$18,900" }
+      };
+      const mapNodes = document.querySelectorAll(".map-node");
+      const mapRegionName = document.getElementById("map-region-name");
+      const mapBottles = document.getElementById("map-bottles");
+      const mapReady = document.getElementById("map-ready");
+      const mapScore = document.getElementById("map-score");
+      const mapValue = document.getElementById("map-value");
+      const mapProducer = document.getElementById("map-producer");
+      const viewRegionBottles = document.getElementById("view-region-bottles");
+      let selectedMapRegion = "Burgundy";
+
+      function selectMapRegion(region) {
+        selectedMapRegion = region;
+        const details = regionalCollection[region];
+        mapNodes.forEach((node) => node.classList.toggle("active", node.dataset.region === region));
+        mapRegionName.textContent = region;
+        mapBottles.textContent = details.bottles;
+        mapReady.textContent = details.ready;
+        mapScore.textContent = details.score;
+        mapValue.textContent = details.value;
+        mapProducer.textContent = details.producer;
+        viewRegionBottles.textContent = `View ${region} bottles`;
+      }
+
+      mapNodes.forEach((node) => node.addEventListener("click", () => selectMapRegion(node.dataset.region)));
+      viewRegionBottles.addEventListener("click", () => {
+        collectionRegion.value = selectedMapRegion;
+        renderCollection();
+        document.getElementById("my-collection").scrollIntoView({ behavior: "smooth" });
+      });
+
+      const actionModal = document.getElementById("action-modal");
+      const modalTitle = document.getElementById("modal-title");
+      const modalCopy = document.getElementById("modal-copy");
+      const modalClose = document.getElementById("modal-close");
+      const modalCancel = document.getElementById("modal-cancel");
+      const modalDone = document.getElementById("modal-done");
+      let pendingDeleteKey = "";
+
+      function openActionModal(title, copy) {
+        pendingDeleteKey = "";
+        actionModal.classList.remove("delete-mode");
+        modalDone.textContent = "Done";
+        modalTitle.textContent = title;
+        modalCopy.textContent = copy;
+        actionModal.classList.add("open");
+        actionModal.setAttribute("aria-hidden", "false");
+        modalClose.focus();
+      }
+
+      function openDeleteModal(key, title, copy) {
+        pendingDeleteKey = key;
+        actionModal.classList.add("delete-mode");
+        modalDone.textContent = "Delete bottles";
+        modalTitle.textContent = `Remove ${title}?`;
+        modalCopy.textContent = copy;
+        actionModal.classList.add("open");
+        actionModal.setAttribute("aria-hidden", "false");
+        modalCancel.focus();
+      }
+
+      function closeActionModal() {
+        actionModal.classList.remove("open");
+        actionModal.classList.remove("delete-mode");
+        actionModal.setAttribute("aria-hidden", "true");
+        pendingDeleteKey = "";
+      }
+
+      renderCollection();
+      document.querySelectorAll("[data-action]").forEach((control) => {
+        if (control.dataset.bound === "true") return;
+        control.addEventListener("click", () => openActionModal(control.dataset.action, control.dataset.copy));
+      });
+      modalClose.addEventListener("click", closeActionModal);
+      modalCancel.addEventListener("click", closeActionModal);
+      modalDone.addEventListener("click", () => {
+        if (pendingDeleteKey) {
+          const index = collectionBottles.findIndex((wine) => `${wine.producer}-${wine.vintage}` === pendingDeleteKey);
+          if (index >= 0) {
+            collectionTotal -= Number.parseInt(collectionBottles[index].quantity, 10);
+            collectionTotalLabel.textContent = collectionTotal;
+            collectionBottles.splice(index, 1);
+          }
+          renderCollection();
+        }
+        closeActionModal();
+      });
+      actionModal.addEventListener("click", (event) => {
+        if (event.target === actionModal) closeActionModal();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && actionModal.classList.contains("open")) closeActionModal();
+      });
+      document.querySelectorAll(".menu a").forEach((link) => {
+        link.addEventListener("click", () => link.closest("details").removeAttribute("open"));
+      });
+    </script>
+  </body>
+</html>
