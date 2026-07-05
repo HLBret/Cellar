@@ -855,28 +855,18 @@
         <aside class="side">
           <section class="panel">
             <p class="eyebrow">Tonight</p>
-            <h2 id="tonight-bottle">Open the 2017 Barolo</h2>
+            <h2 id="tonight-bottle">No bottles to recommend yet</h2>
             <div class="location-search">
               <label class="location-field" style="margin-top:0">
                 <input class="location-input" id="location-query" type="text" placeholder="City or postcode" aria-label="Type a city or postcode" />
               </label>
               <button class="location-button" id="search-location">Use</button>
             </div>
-            <div class="saved-location">
-              <label class="location-field" style="margin-top:0">
-                <select id="location-picker" aria-label="Saved location">
-                  <option value="paris">Paris, France</option>
-                  <option value="newYork">New York, USA</option>
-                  <option value="sanFrancisco">San Francisco, USA</option>
-                  <option value="london">London, UK</option>
-                </select>
-              </label>
-              <button class="icon-button" id="device-location" aria-label="Use my current location" title="Use my current location">◎</button>
-            </div>
+            <button class="location-button" id="device-location" style="width:100%;padding:11px;margin-top:8px" aria-label="Use my current location">Use my location</button>
             <p class="location-status" id="location-status" role="status"></p>
-            <div class="weather-line" id="tonight-weather">18 C / cool evening</div>
-            <p class="copy" id="tonight-reason">Add bottles to receive collection-aware recommendations. Cool Paris weather currently favors braised short rib, porcini risotto, or aged Comte.</p>
-            <div class="chips"><div class="chip" id="tonight-temp">18 C</div><div class="chip" id="tonight-decant">45 min</div><div class="chip" id="tonight-window">2026-2034</div></div>
+            <div class="weather-line" id="tonight-weather">Location not set</div>
+            <p class="copy" id="tonight-reason">Add a bottle to receive a recommendation from your own collection.</p>
+            <div class="chips"><div class="chip" id="tonight-temp">No bottle</div><div class="chip" id="tonight-decant">No service</div><div class="chip" id="tonight-window">No window</div></div>
           </section>
           <section class="panel dark" id="sommelier">
             <p class="eyebrow">AI Sommelier</p>
@@ -1129,34 +1119,6 @@
         handleBottleFile(event.dataTransfer.files[0]);
       });
 
-      const locationProfiles = {
-        paris: {
-          weather: "18 C / cool evening",
-          bottle: "Open the 2017 Barolo",
-          reason: "Cool Paris weather favors braised short rib, porcini risotto, or aged Comte. Add bottles for collection-aware recommendations.",
-          service: ["18 C", "45 min", "2026-2034"]
-        },
-        newYork: {
-          weather: "26 C / humid",
-          bottle: "Open the 2020 Puligny-Montrachet",
-          reason: "A warmer, humid night calls for something lifted and precise with roast chicken, grilled corn, or lemony seafood.",
-          service: ["11 C", "0 min", "2025-2030"]
-        },
-        sanFrancisco: {
-          weather: "15 C / foggy",
-          bottle: "Open the 2018 Clos Saint-Jacques",
-          reason: "The foggy evening suits aromatic Burgundy with duck, mushrooms, salmon, or a simple roast bird.",
-          service: ["16 C", "30 min", "2028-2038"]
-        },
-        london: {
-          weather: "14 C / rainy",
-          bottle: "Open the 2016 Saint-Julien half bottle",
-          reason: "A rainy evening makes structured Bordeaux feel right with lamb, lentils, or a savory pie.",
-          service: ["17 C", "60 min", "2027-2042"]
-        }
-      };
-
-      const picker = document.getElementById("location-picker");
       const locationQuery = document.getElementById("location-query");
       const searchLocationButton = document.getElementById("search-location");
       const deviceLocationButton = document.getElementById("device-location");
@@ -1167,14 +1129,26 @@
       const temp = document.getElementById("tonight-temp");
       const decant = document.getElementById("tonight-decant");
       const windowLabel = document.getElementById("tonight-window");
+      let activeTonightProfile = { weather: "Location not set" };
 
       function showProfile(profile) {
-        bottle.textContent = profile.bottle;
+        activeTonightProfile = profile;
         weather.textContent = profile.weather;
-        reason.textContent = profile.reason;
-        temp.textContent = profile.service[0];
-        decant.textContent = profile.service[1];
-        windowLabel.textContent = profile.service[2];
+        const ownedBottle = collectionBottles[0];
+        if (!ownedBottle) {
+          bottle.textContent = "No bottles to recommend yet";
+          reason.textContent = `${profile.weather}. Add a bottle to receive a recommendation from your own collection.`;
+          temp.textContent = "No bottle";
+          decant.textContent = "No service";
+          windowLabel.textContent = "No window";
+          return;
+        }
+        const service = ownedBottle.service.split("/").map((item) => item.trim());
+        bottle.textContent = `Open the ${ownedBottle.vintage} ${ownedBottle.wine}`;
+        reason.textContent = `From your cellar, this is the best match for ${profile.weather}. ${ownedBottle.note}`;
+        temp.textContent = service[0] || "See details";
+        decant.textContent = service[1] || "See details";
+        windowLabel.textContent = ownedBottle.window;
       }
 
       const weatherDescriptions = {
@@ -1190,25 +1164,16 @@
         const rounded = Math.round(temperature);
         if (temperature >= 23) {
           return {
-            weather: `${rounded} C / ${condition}`,
-            bottle: "Open the 2020 Puligny-Montrachet",
-            reason: `Using live weather for ${label}: the ${condition}, ${rounded} C conditions call for something lifted and precise with seafood, roast chicken, or summer vegetables.`,
-            service: ["11 C", "0 min", "2025-2030"]
+            weather: `${rounded} C / ${condition}`
           };
         }
         if (temperature <= 10 || code >= 51) {
           return {
-            weather: `${rounded} C / ${condition}`,
-            bottle: "Open the 2016 Saint-Julien half bottle",
-            reason: `Using live weather for ${label}: the ${condition}, ${rounded} C conditions suit structured Bordeaux with lamb, lentils, or a savory pie.`,
-            service: ["17 C", "60 min", "2027-2042"]
+            weather: `${rounded} C / ${condition}`
           };
         }
         return {
-          weather: `${rounded} C / ${condition}`,
-          bottle: "Open the 2018 Clos Saint-Jacques",
-          reason: `Using live weather for ${label}: the ${condition}, ${rounded} C evening suits aromatic Burgundy with duck, mushrooms, salmon, or roast chicken.`,
-          service: ["16 C", "30 min", "2028-2038"]
+          weather: `${rounded} C / ${condition}`
         };
       }
 
@@ -1248,10 +1213,6 @@
         }
       }
 
-      picker.addEventListener("change", () => {
-        showProfile(locationProfiles[picker.value]);
-        locationStatus.textContent = "";
-      });
       searchLocationButton.addEventListener("click", searchLocation);
       locationQuery.addEventListener("keydown", (event) => {
         if (event.key === "Enter") searchLocation();
@@ -1326,6 +1287,7 @@
         document.getElementById("overview-white").textContent = collectionTotal;
         document.getElementById("pulse-ready").textContent = `${ready} bottles are in their recommended window`;
         document.getElementById("pulse-region").textContent = collectionBottles.length ? collectionBottles[0].region : "No regions represented yet";
+        showProfile(activeTonightProfile);
         selectMapRegion(selectedMapRegion);
       }
 

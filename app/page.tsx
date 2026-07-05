@@ -95,43 +95,9 @@ const regionalCollection = {
   "Santa Cruz": {}
 };
 
-const locationProfiles = {
-  paris: {
-    label: "Paris, France",
-    weather: "18 C / cool evening",
-    bottle: "Open the 2017 Barolo",
-    reason: "cool Paris weather favors braised short rib, porcini risotto, or aged Comte.",
-    service: ["18 C", "45 min", "2026-2034"]
-  },
-  newYork: {
-    label: "New York, USA",
-    weather: "26 C / humid",
-    bottle: "Open the 2020 Puligny-Montrachet",
-    reason: "a warmer, humid night calls for something lifted and precise with roast chicken, grilled corn, or lemony seafood.",
-    service: ["11 C", "0 min", "2025-2030"]
-  },
-  sanFrancisco: {
-    label: "San Francisco, USA",
-    weather: "15 C / foggy",
-    bottle: "Open the 2018 Clos Saint-Jacques",
-    reason: "the foggy evening suits aromatic Burgundy with duck, mushrooms, salmon, or a simple roast bird.",
-    service: ["16 C", "30 min", "2028-2038"]
-  },
-  london: {
-    label: "London, UK",
-    weather: "14 C / rainy",
-    bottle: "Open the 2016 Saint-Julien half bottle",
-    reason: "a rainy evening makes structured Bordeaux feel right with lamb, lentils, or a savory pie.",
-    service: ["17 C", "60 min", "2027-2042"]
-  }
-};
-
 type TonightProfile = {
   label: string;
   weather: string;
-  bottle: string;
-  reason: string;
-  service: string[];
 };
 
 const weatherDescriptions: Record<number, string> = {
@@ -161,32 +127,22 @@ function profileForWeather(label: string, temperature: number, weatherCode: numb
   if (temperature >= 23) {
     return {
       label,
-      weather: `${Math.round(temperature)} C / ${condition}`,
-      bottle: "Open the 2020 Puligny-Montrachet",
-      reason: `the ${condition}, ${Math.round(temperature)} C weather calls for something lifted and precise with seafood, roast chicken, or summer vegetables.`,
-      service: ["11 C", "0 min", "2025-2030"]
+      weather: `${Math.round(temperature)} C / ${condition}`
     };
   }
   if (temperature <= 10 || weatherCode >= 51) {
     return {
       label,
-      weather: `${Math.round(temperature)} C / ${condition}`,
-      bottle: "Open the 2016 Saint-Julien half bottle",
-      reason: `the ${condition}, ${Math.round(temperature)} C weather suits structured Bordeaux with lamb, lentils, or a savory pie.`,
-      service: ["17 C", "60 min", "2027-2042"]
+      weather: `${Math.round(temperature)} C / ${condition}`
     };
   }
   return {
     label,
-    weather: `${Math.round(temperature)} C / ${condition}`,
-    bottle: "Open the 2018 Clos Saint-Jacques",
-    reason: `the ${condition}, ${Math.round(temperature)} C evening suits aromatic Burgundy with duck, mushrooms, salmon, or a simple roast bird.`,
-    service: ["16 C", "30 min", "2028-2038"]
+    weather: `${Math.round(temperature)} C / ${condition}`
   };
 }
 
 export default function Home() {
-  const [selectedLocation, setSelectedLocation] = useState<keyof typeof locationProfiles>("paris");
   const [liveTonight, setLiveTonight] = useState<TonightProfile | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
   const [locationStatus, setLocationStatus] = useState("");
@@ -205,7 +161,14 @@ export default function Home() {
   const [sommelierMessages, setSommelierMessages] = useState<Array<{ role: "assistant" | "user"; text: string }>>([
     { role: "assistant", text: "Good evening. What are you cooking, or what would you like to open?" }
   ]);
-  const tonight = liveTonight ?? locationProfiles[selectedLocation];
+  const tonight = liveTonight ?? {
+    label: "",
+    weather: "Location not set"
+  };
+  const recommendedBottle = collectionBottles[0];
+  const recommendationService = recommendedBottle
+    ? [...recommendedBottle.service.split("/").map((item) => item.trim()), recommendedBottle.drinkingWindow]
+    : ["No bottle", "No service", "No window"];
   const collectionTotal = collectionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
   const visibleBottles = collectionBottles
     .filter((bottle) => collectionRegion === "All regions" || bottle.region.includes(collectionRegion))
@@ -481,12 +444,18 @@ export default function Home() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Today&apos;s recommendation</p>
-                  <h2 className="mt-2 font-serif text-3xl">{tonight.bottle}</h2>
+                  <h2 className="mt-2 font-serif text-3xl">
+                    {recommendedBottle ? `Open the ${recommendedBottle.vintage} ${recommendedBottle.wine}` : "No bottles to recommend yet"}
+                  </h2>
                 </div>
                 <button
                   className="grid size-10 place-items-center rounded-md bg-cellar-ink text-white"
                   aria-label="Open recommendation"
-                  onClick={() => showDialog(tonight.bottle, `${tonight.reason} Serve at ${tonight.service[0]} and decant for ${tonight.service[1]}.`)}
+                  disabled={!recommendedBottle}
+                  onClick={() => recommendedBottle && showDialog(
+                    `${recommendedBottle.vintage} ${recommendedBottle.wine}`,
+                    `${recommendedBottle.note} Serve ${recommendedBottle.service}. Drinking window ${recommendedBottle.drinkingWindow}.`
+                  )}
                 >
                   <ArrowUpRight className="size-5" aria-hidden />
                 </button>
@@ -512,43 +481,25 @@ export default function Home() {
                   Use
                 </button>
               </div>
-              <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
-                <label className="flex items-center gap-2 rounded-md bg-white/72 px-3 py-2 text-sm font-medium text-cellar-ink">
-                <MapPin className="size-4 text-burgundy-700" aria-hidden />
-                <span className="sr-only">Saved location</span>
-                <select
-                  className="w-full bg-transparent text-sm outline-none"
-                  value={selectedLocation}
-                  onChange={(event) => {
-                    setSelectedLocation(event.target.value as keyof typeof locationProfiles);
-                    setLiveTonight(null);
-                    setLocationStatus("");
-                  }}
-                >
-                  {Object.entries(locationProfiles).map(([value, profile]) => (
-                    <option value={value} key={value}>{profile.label}</option>
-                  ))}
-                </select>
-              </label>
-                <button
-                  className="grid size-10 place-items-center rounded-md border border-cellar-oak/20 bg-white/72 text-burgundy-700"
-                  aria-label="Use my current location"
-                  title="Use my current location"
-                  onClick={useDeviceLocation}
-                >
-                  <LocateFixed className="size-4" aria-hidden />
-                </button>
-              </div>
+              <button
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-cellar-oak/20 bg-white/72 px-3 py-3 text-sm font-medium text-burgundy-700"
+                onClick={useDeviceLocation}
+              >
+                <LocateFixed className="size-4" aria-hidden />
+                Use my location
+              </button>
               {locationStatus && <p className="mt-2 text-xs font-medium text-cellar-walnut" role="status">{locationStatus}</p>}
               <div className="mt-3 inline-flex items-center gap-2 rounded-md bg-burgundy-50 px-3 py-2 text-sm font-medium text-burgundy-900">
                 <CloudSun className="size-4" aria-hidden />
                 {tonight.weather}
               </div>
               <p className="mt-4 leading-7 text-cellar-walnut">
-                {collectionTotal ? `Your collection has ${collectionTotal} bottles, and ${tonight.reason}` : `Add bottles for collection-aware recommendations. For now, ${tonight.reason}`}
+                {recommendedBottle
+                  ? `From your collection, this is the best match for ${tonight.weather}. ${recommendedBottle.note}`
+                  : "Add a bottle to receive a recommendation from your own collection."}
               </p>
               <div className="mt-5 grid grid-cols-3 gap-2 text-center text-sm">
-                {tonight.service.map((item) => (
+                {recommendationService.map((item) => (
                   <div className="rounded-md bg-white/72 px-2 py-3 font-medium" key={item}>
                     {item}
                   </div>
