@@ -8,6 +8,7 @@ type ResearchSource = {
 
 type WineResearch = {
   summary: string;
+  wineColor: string;
   nose: string;
   palate: string;
   finish: string;
@@ -47,6 +48,7 @@ const schema = {
   additionalProperties: false,
   properties: {
     summary: { type: "string" },
+    wineColor: { type: "string" },
     nose: { type: "string" },
     palate: { type: "string" },
     finish: { type: "string" },
@@ -104,7 +106,7 @@ const schema = {
     }
   },
   required: [
-    "summary", "nose", "palate", "finish", "tastingNotes", "communityRating",
+    "summary", "wineColor", "nose", "palate", "finish", "tastingNotes", "communityRating",
     "communityConsensus", "criticScores", "drinkWindow",
     "communityPairings", "sommelierPairings", "sources"
   ]
@@ -162,6 +164,9 @@ export async function POST(request: Request) {
     `Research this exact wine and vintage: ${bottle.vintage} ${bottle.producer} ${bottle.wine}.`,
     `Known region/appellation: ${bottle.region ?? "unknown"} / ${bottle.appellation ?? "unknown"}.`,
     "Use web search in real time. Prioritize the producer's official site, CellarTracker, Vivino, Wine Spectator, Decanter, and Robert Parker Wine Advocate.",
+    "First verify the exact wine's color and style from an exact-cuvee source. Do not infer color from bottle glass or from the broader region.",
+    "Set wineColor to a concise value such as White wine, Red wine, Rose wine, Orange wine, or Sparkling wine.",
+    "Make every tasting descriptor, food pairing, and drinking-window statement consistent with that verified color, grape blend, and winemaking method.",
     "Only use information visible in public search results or publicly accessible pages. Do not bypass subscriptions, logins, robots restrictions, or licensing restrictions.",
     "Never transfer a rating, review, or drinking window from a different vintage. If the exact vintage is unavailable, leave the field as 'Not publicly available'.",
     "Paraphrase tasting notes briefly. Do not reproduce long critic or community reviews.",
@@ -202,16 +207,18 @@ export async function POST(request: Request) {
       })
     });
   } catch {
+    console.error("OpenAI wine research request could not reach the API.");
     return NextResponse.json(
-      { error: "Cellar could not reach OpenAI web research." },
+      { error: "Live wine research is temporarily unavailable." },
       { status: 502 }
     );
   }
 
   if (!response.ok) {
     const message = getErrorMessage(await response.text());
+    console.error(`OpenAI wine research failed (${response.status}): ${message}`);
     return NextResponse.json(
-      { error: `OpenAI web research failed: ${message}` },
+      { error: "Live wine research is temporarily unavailable." },
       { status: response.status }
     );
   }
@@ -219,8 +226,9 @@ export async function POST(request: Request) {
   const data = await response.json() as ResponsesData;
   const responseText = getResponseText(data);
   if (!responseText) {
+    console.error("OpenAI wine research returned no output text.");
     return NextResponse.json(
-      { error: "OpenAI web research did not return structured wine details." },
+      { error: "Live wine research is temporarily unavailable." },
       { status: 502 }
     );
   }
@@ -229,8 +237,9 @@ export async function POST(request: Request) {
   try {
     research = JSON.parse(responseText) as WineResearch;
   } catch {
+    console.error("OpenAI wine research returned unreadable structured output.");
     return NextResponse.json(
-      { error: "OpenAI web research returned details that Cellar could not read." },
+      { error: "Live wine research is temporarily unavailable." },
       { status: 502 }
     );
   }

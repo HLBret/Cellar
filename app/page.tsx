@@ -32,6 +32,7 @@ import { createPortal } from "react-dom";
 
 type WineResearch = {
   summary: string;
+  wineColor: string;
   nose: string;
   palate: string;
   finish: string;
@@ -68,6 +69,7 @@ type CollectionBottle = {
   appellation: string;
   grapes: string;
   classification: string;
+  style?: string;
   cellar: string;
   score: string;
   window: string;
@@ -199,6 +201,7 @@ function toCollectionBottle(recognition: AiRecognition): CollectionBottle {
     appellation: recognition.appellation || "Appellation unknown",
     grapes: recognition.grapes || "Grapes not confirmed",
     classification: recognition.classification || recognition.style || "Wine",
+    style: recognition.style,
     cellar: "Location not set",
     score: String(Math.round(Math.max(0, Math.min(100, recognition.confidence || 0)))),
     window: recognition.drinkingWindow ? "Research suggested" : "Needs review",
@@ -332,7 +335,7 @@ export default function Home() {
   async function handleBottleImage(file?: File) {
     if (!file) return;
     setRecognizedBottle(null);
-    setRecognitionStatus("Reading label with ChatGPT Vision...");
+    setRecognitionStatus("Thinking...");
     setIsRecognizing(true);
     setResearchIndex(-1);
     setBottleImageName(file.name);
@@ -355,8 +358,9 @@ export default function Home() {
       setIsRecognizing(false);
       return;
     } catch (error) {
+      console.error("Cellar bottle recognition failed:", error);
       setResearchIndex(-1);
-      setRecognitionStatus(error instanceof Error ? error.message : "AI recognition unavailable.");
+      setRecognitionStatus("We could not identify this bottle. Try another photo.");
       setIsRecognizing(false);
     }
   }
@@ -479,6 +483,8 @@ export default function Home() {
         ...bottle,
         research,
         note: research.summary || bottle.note,
+        style: research.wineColor || bottle.style,
+        tastingNotes: research.tastingNotes.length ? research.tastingNotes : bottle.tastingNotes,
         drinkingWindow: research.drinkWindow.start && research.drinkWindow.end
           ? `${research.drinkWindow.start}-${research.drinkWindow.end}`
           : bottle.drinkingWindow,
@@ -492,7 +498,8 @@ export default function Home() {
           : item
       ));
     } catch (error) {
-      setBottleResearchError(error instanceof Error ? error.message : "Live wine research is unavailable.");
+      console.error("Cellar bottle research failed:", error);
+      setBottleResearchError("Live wine research is temporarily unavailable.");
     } finally {
       setIsResearchingBottle(false);
     }
@@ -931,6 +938,7 @@ export default function Home() {
                   ["Region", researchedBottle.region],
                   ["Appellation", researchedBottle.appellation],
                   ["Grapes", researchedBottle.grapes],
+                  ["Style", researchedBottle.style ?? researchedBottle.classification],
                   ["Classification", researchedBottle.classification],
                   ["Drinking window", researchedBottle.drinkingWindow],
                   ["Serving", researchedBottle.service],
@@ -1241,7 +1249,12 @@ export default function Home() {
           >
             <header className="flex items-start justify-between gap-4 border-b border-cellar-oak/20 p-5 sm:p-7">
               <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">{activeBottle.vintage} / {activeBottle.region}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">{activeBottle.vintage} / {activeBottle.region}</p>
+                  <span className="rounded-md bg-burgundy-50 px-2 py-1 text-xs font-medium text-burgundy-900">
+                    {activeBottle.research?.wineColor || activeBottle.style || "Wine color not confirmed"}
+                  </span>
+                </div>
                 <h2 className="mt-2 font-serif text-3xl sm:text-4xl" id="wine-detail-title">{activeBottle.producer}</h2>
                 <p className="mt-1 text-lg text-cellar-walnut">{activeBottle.wine}</p>
               </div>

@@ -103,11 +103,14 @@ export async function POST(request: Request) {
     "Read the producer, exact cuvee or wine name, vintage, appellation, region, classification, and visible label wording before using general wine knowledge.",
     "Treat large display text as a possible wine name rather than automatically assuming it is the producer.",
     "Check smaller script and estate text carefully for the producer or bottler.",
+    "Determine whether the exact wine is white, red, rose, sparkling, fortified, or sweet before writing any tasting note.",
+    "Do not infer wine color from dark bottle glass. Some white wines, including age-worthy white Rioja, are bottled in dark glass.",
+    "Set style to an explicit description such as 'Dry white wine' or 'Still red wine'. If color cannot be confirmed, say 'Color not confirmed' and avoid color-specific tasting notes.",
     "Never replace an unfamiliar bottle with a famous or familiar wine.",
     "If the exact identity is uncertain, state that clearly, set confidence below 60, and provide concise alternatives.",
     "Do not invent critic scores, market prices, producer history, vintage facts, or grape composition.",
     "Provide tasting notes, drinking window, service, and food pairing only when the identified wine supports them.",
-    "Return 8 to 14 concise one- or two-word aroma and flavor descriptors in tastingNotes, such as vanilla, tobacco, mushroom, citrus peel, or wet stone.",
+    "Return 8 to 14 concise one- or two-word aroma and flavor descriptors in tastingNotes. Every descriptor must be plausible for the exact identified wine, color, grapes, and winemaking style.",
     "Sources must describe the evidence used, such as visible front-label text or general wine knowledge; do not claim to have searched a site."
   ].join(" ");
 
@@ -140,16 +143,18 @@ export async function POST(request: Request) {
       })
     });
   } catch {
+    console.error("OpenAI recognition request could not reach the API.");
     return NextResponse.json(
-      { error: "Cellar could not reach OpenAI. Check your internet connection and try again." },
+      { error: "Bottle recognition is temporarily unavailable." },
       { status: 502 }
     );
   }
 
   if (!response.ok) {
     const message = getOpenAiErrorMessage(await response.text());
+    console.error(`OpenAI recognition failed (${response.status}): ${message}`);
     return NextResponse.json(
-      { error: `OpenAI could not identify this bottle: ${message}` },
+      { error: "Bottle recognition is temporarily unavailable." },
       { status: response.status }
     );
   }
@@ -160,14 +165,16 @@ export async function POST(request: Request) {
   try {
     output = responseText ? JSON.parse(responseText) as WineRecognition : null;
   } catch {
+    console.error("OpenAI recognition returned unreadable structured output.");
     return NextResponse.json(
-      { error: "OpenAI returned an identification that Cellar could not read." },
+      { error: "Bottle recognition is temporarily unavailable." },
       { status: 502 }
     );
   }
   if (!output) {
+    console.error("OpenAI recognition returned no output text.");
     return NextResponse.json(
-      { error: "OpenAI did not return a usable wine identification." },
+      { error: "Bottle recognition is temporarily unavailable." },
       { status: 502 }
     );
   }
