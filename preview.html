@@ -500,6 +500,7 @@
         grid-template-columns: 1.1fr .9fr;
         gap: 18px;
       }
+      .overview-grid.single { grid-template-columns: 1fr; }
       .overview-stats {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -511,6 +512,7 @@
         gap: 10px;
         margin-top: 16px;
       }
+      .overview-zones.single { grid-template-columns: 1fr; }
       .mini {
         border-radius: 6px;
         background: var(--paper);
@@ -673,20 +675,27 @@
       .identify-action:disabled { cursor: not-allowed; opacity: .42; }
       .map {
         position: relative;
-        min-height: 230px;
+        min-height: 360px;
         border-radius: 8px;
-        background: radial-gradient(circle at 44% 45%, rgba(199,162,90,.4), transparent 18%), radial-gradient(circle at 58% 38%, rgba(143,29,58,.56), transparent 14%), linear-gradient(135deg,#293532,#111);
+        overflow: hidden;
+        border: 1px solid rgba(199,162,90,.22);
+        background: radial-gradient(circle at 22% 25%, rgba(199,162,90,.3), transparent 16%), radial-gradient(circle at 45% 42%, rgba(143,29,58,.55), transparent 14%), radial-gradient(circle at 74% 66%, rgba(91,112,85,.45), transparent 16%), linear-gradient(135deg,#303b36,#111);
       }
       .map-node {
         position: absolute;
-        border-radius: 999px;
+        min-width: 106px;
+        border: 1px solid rgba(255,255,255,.22);
+        border-radius: 6px;
         background: var(--gold);
         color: var(--ink);
-        padding: 7px 9px;
+        padding: 9px 10px;
         font-size: 12px;
         font-weight: 800;
+        text-align: left;
+        box-shadow: 0 14px 30px rgba(0,0,0,.18);
       }
       .map-node.active { background: white; color: var(--burgundy); outline: 2px solid var(--gold); }
+      .map-node span { display: block; margin-top: 3px; font-size: 11px; opacity: .72; }
       .map-detail {
         margin-top: 12px;
         border: 1px solid rgba(199,162,90,.25);
@@ -722,6 +731,8 @@
         text-decoration: none;
         font-weight: 700;
       }
+      .map-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .open-link.secondary { background: rgba(255,255,255,.12); color: var(--cream); }
       .modal {
         position: fixed;
         inset: 0;
@@ -873,7 +884,7 @@
             <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
             <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
           </div>
-          <span class="pill">Entering the west cellar</span>
+          <span class="pill">Entering <span id="hero-cellar-name">My Cellar</span></span>
           <h1 class="serif">Welcome back, <span id="welcome-name">First_Name</span>.</h1>
           <p>Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which vintage deserves the table tonight.</p>
           <div class="bottle"><div class="label"><small>Grand Cru</small><b>Cellar</b><p>AI Selected</p><b>2018</b></div></div>
@@ -929,7 +940,7 @@
           </div>
           <a class="browse" href="#my-collection" style="text-decoration:none">Browse cellar</a>
         </div>
-        <div class="overview-grid">
+        <div class="overview-grid single">
           <div class="panel">
             <div class="overview-stats">
               <div class="mini"><strong id="overview-total">0</strong><span>Total bottles</span></div>
@@ -937,19 +948,14 @@
               <div class="mini"><strong id="overview-white">0</strong><span>White</span></div>
               <div class="mini"><strong id="overview-sparkling">0</strong><span>Sparkling</span></div>
             </div>
-            <div class="overview-zones">
-              <article class="zone"><h3>West cellar</h3><strong>0 bottles</strong><p>No bottles assigned</p></article>
-              <article class="zone"><h3>Wine fridge</h3><strong>0 bottles</strong><p>No bottles assigned</p></article>
-              <article class="zone"><h3>Offsite storage</h3><strong>0 bottles</strong><p>No bottles assigned</p></article>
+            <div class="overview-zones single">
+              <article class="zone">
+                <h3 id="overview-cellar-name">My Cellar</h3>
+                <strong><span id="overview-cellar-bottles">0</span> bottles</strong>
+                <p>One private cellar for every bottle, vintage, tasting note, and storage detail.</p>
+                <a class="browse" href="#settings" style="display:inline-flex;margin-top:10px;text-decoration:none">Rename cellar</a>
+              </article>
             </div>
-          </div>
-          <div class="panel dark">
-            <p class="eyebrow">Collection pulse</p>
-            <h2>What is happening now</h2>
-            <div class="pulse-item"><strong>Ready to open</strong><span id="pulse-ready">0 bottles are in their recommended window</span></div>
-            <div class="pulse-item"><strong>Entering peak</strong><span>Add a bottle to begin tracking maturity</span></div>
-            <div class="pulse-item"><strong>Needs attention</strong><span>0 bottles are past the ideal drinking range</span></div>
-            <div class="pulse-item"><strong>Most represented</strong><span id="pulse-region">No regions represented yet</span></div>
           </div>
         </div>
       </section>
@@ -997,11 +1003,11 @@
           <p class="eyebrow">Collection geography</p>
           <h2>Regional Map</h2>
           <div class="map" id="map-plot">
-            <button class="map-node active" data-region="Burgundy" style="left:16%;top:24%">Burgundy</button>
-            <button class="map-node" data-region="Bordeaux" style="left:48%;top:21%">Bordeaux</button>
-            <button class="map-node" data-region="Champagne" style="left:63%;top:44%">Champagne</button>
-            <button class="map-node" data-region="Piedmont" style="left:28%;top:62%">Piedmont</button>
-            <button class="map-node" data-region="Santa Cruz" style="left:58%;top:70%">Santa Cruz</button>
+            <button class="map-node active" data-region="Burgundy" style="left:12%;top:22%">Burgundy<span>0 bottles</span></button>
+            <button class="map-node" data-region="Bordeaux" style="left:30%;top:42%">Bordeaux<span>0 bottles</span></button>
+            <button class="map-node" data-region="Champagne" style="left:48%;top:62%">Champagne<span>0 bottles</span></button>
+            <button class="map-node" data-region="Piedmont" style="left:58%;top:28%">Piedmont<span>0 bottles</span></button>
+            <button class="map-node" data-region="Santa Cruz" style="left:70%;top:52%">Santa Cruz<span>0 bottles</span></button>
           </div>
           <div class="map-detail">
             <p class="eyebrow">Selected region</p>
@@ -1012,9 +1018,13 @@
               <div><small>Average score</small><strong id="map-score">-</strong></div>
               <div><small>Collection value</small><strong id="map-value">-</strong></div>
             </div>
-            <p class="map-producer">Most owned: <span id="map-producer">None yet</span></p>
+            <p class="map-producer">Top bottle: <span id="map-producer">None yet</span></p>
           </div>
           <button class="open-link" id="view-region-bottles">View Burgundy bottles</button>
+          <div class="map-actions">
+            <button class="open-link" id="ready-region-bottles">Ready in Burgundy</button>
+            <button class="open-link secondary" id="region-summary">Region summary</button>
+          </div>
         </section>
       </section>
 
@@ -1050,6 +1060,7 @@
         <h2>Your Cellar profile</h2>
         <form class="profile-form" id="profile-form">
           <input id="profile-first-name" type="text" placeholder="First name" autocomplete="given-name" aria-label="First name" />
+          <input id="profile-cellar-name" type="text" placeholder="Cellar name" aria-label="Cellar name" />
           <button type="submit">Save profile</button>
         </form>
         <p class="profile-status" id="profile-status" role="status"></p>
@@ -1091,6 +1102,12 @@
           grapes: "100% Chardonnay", score: 96, maturity: "Approaching peak", window: "2027-2042",
           quantity: "1 bottle", storage: "Location not set", service: "12 C / no decant", purchase: "Not added",
           market: "Researching", color: "linear-gradient(135deg,#a48b55,#596659)",
+          confidence: 91,
+          sources: ["Preview fallback", "OpenAI Vision-ready research schema"],
+          alternatives: ["Domaine Leflaive Clavoillon", "Etienne Sauzet Les Combettes"],
+          producerHistory: "Domaine Leflaive is one of Puligny-Montrachet's benchmark domaines, known for precise, long-lived white Burgundy.",
+          vintageSummary: "2020 Burgundy whites are concentrated and ripe, but the strongest producers kept tension and mineral drive.",
+          foodPairing: "Roast chicken, scallops, sole meuniere, Comte, or a simple mushroom tart.",
           note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. Layered, satin-textured, and mineral."
         },
         {
@@ -1099,6 +1116,12 @@
           grapes: "Cabernet Sauvignon blend", score: 96, maturity: "Needs aging", window: "2032-2065",
           quantity: "1 bottle", storage: "Location not set", service: "17 C / 90 min decant", purchase: "Not added",
           market: "Researching", color: "linear-gradient(135deg,#637456,#4e5b5b)",
+          confidence: 88,
+          sources: ["Preview fallback", "OpenAI Vision-ready research schema"],
+          alternatives: ["Ridge Estate Cabernet Sauvignon", "Ridge Monte Bello older vintage"],
+          producerHistory: "Ridge is a historic California estate with a restrained, ageworthy style centered on mountain fruit and transparent winemaking.",
+          vintageSummary: "2019 Santa Cruz Cabernet generally shows polish, freshness, and long-term structure.",
+          foodPairing: "Dry-aged steak, lamb shoulder, short ribs, grilled mushrooms, or aged cheddar.",
           note: "Mountain cassis, mint, crushed stone, cedar, and savory herbs framed by fresh acidity and firm tannins."
         },
         {
@@ -1107,6 +1130,12 @@
           grapes: "100% Nebbiolo", score: 99, maturity: "Entering peak", window: "2026-2055",
           quantity: "1 bottle", storage: "Location not set", service: "18 C / 180 min decant", purchase: "Not added",
           market: "Researching", color: "linear-gradient(135deg,#7a2832,#34211d)",
+          confidence: 93,
+          sources: ["Preview fallback", "OpenAI Vision-ready research schema"],
+          alternatives: ["Giacomo Conterno Cascina Francia", "Roberto Conterno Barolo Francia"],
+          producerHistory: "Giacomo Conterno is among Barolo's most revered traditional producers, famous for powerful, slow-evolving Nebbiolo.",
+          vintageSummary: "2013 Barolo is a classic, structured vintage with aromatic lift and excellent aging potential.",
+          foodPairing: "Braised beef, truffle risotto, porcini, lamb, aged Parmigiano-Reggiano, or tajarin.",
           note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity."
         }
       ];
@@ -1124,7 +1153,12 @@
         const details = [
           ["Producer", wine.producer], ["Wine", wine.wine], ["Vintage", wine.vintage], ["Region", wine.region],
           ["Appellation", wine.appellation], ["Grapes", wine.grapes], ["Classification", wine.classification],
-          ["Drinking window", wine.window], ["Serving", wine.service], ["Tasting notes", wine.note]
+          ["Confidence", `${wine.confidence || 86}%`], ["Sources", (wine.sources || ["Curated Cellar fallback"]).join(" / ")],
+          ["Drinking window", wine.window], ["Serving", wine.service], ["Tasting notes", wine.note],
+          ["Producer notes", wine.producerHistory || "Detailed producer notes require AI recognition."],
+          ["Vintage notes", wine.vintageSummary || "Detailed vintage notes require AI recognition."],
+          ["Pairing", wine.foodPairing || "Pairing research requires AI recognition."],
+          ["Other likely matches", (wine.alternatives || ["None shown"]).join(" / ")]
         ];
         recognitionDetails.innerHTML = details.map(([label, value]) => `<div class="row"><span>${label}</span><strong>${value}</strong></div>`).join("");
       }
@@ -1133,7 +1167,7 @@
         if (!bottlePhotoReady) return;
         currentResearchIndex = (currentResearchIndex + 1) % researchedWines.length;
         renderRecognition();
-        recognitionStatus.textContent = `Updated match: ${currentResearchedWine().vintage} ${currentResearchedWine().producer}`;
+        recognitionStatus.textContent = `Updated candidate: ${currentResearchedWine().vintage} ${currentResearchedWine().producer} · ${currentResearchedWine().confidence}% confidence`;
       }
 
       function updateBottleIntent() {
@@ -1145,8 +1179,8 @@
         identifyAction.textContent = bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving";
         if (bottlePhotoReady) {
           recognitionStatus.textContent = bottleIntent === "collection"
-            ? "Ready to identify and add to your collection"
-            : "Ready to identify without saving";
+            ? `Best preview match ready: ${currentResearchedWine().producer}`
+            : `Preview research ready: ${currentResearchedWine().producer}`;
         }
       }
 
@@ -1155,7 +1189,7 @@
         bottlePhotoReady = true;
         const fileLabel = file.name.toLowerCase();
         const matchedIndex = researchedWines.findIndex((wine) => fileLabel.includes(wine.producer.split(" ")[0].toLowerCase()) || fileLabel.includes(wine.wine.split(" ")[0].toLowerCase()));
-        currentResearchIndex = matchedIndex >= 0 ? matchedIndex : (currentResearchIndex + 1) % researchedWines.length;
+        currentResearchIndex = matchedIndex >= 0 ? matchedIndex : 0;
         fileName.textContent = file.name;
         previewImage.src = URL.createObjectURL(file);
         previewImage.style.display = "block";
@@ -1354,7 +1388,7 @@
           const quantity = Number.parseInt(collectionBottles[existing].quantity, 10) + 1;
           collectionBottles[existing].quantity = `${quantity} bottles`;
         } else {
-          collectionBottles.push({ ...researchedBottle });
+          collectionBottles.push({ ...researchedBottle, storage: activeCellarName });
         }
         persistCollection();
         updateCollectionStats();
@@ -1372,8 +1406,7 @@
         document.getElementById("stat-regions").textContent = regions.size;
         document.getElementById("overview-total").textContent = collectionTotal;
         document.getElementById("overview-white").textContent = collectionTotal;
-        document.getElementById("pulse-ready").textContent = `${ready} bottles are in their recommended window`;
-        document.getElementById("pulse-region").textContent = collectionBottles.length ? collectionBottles[0].region : "No regions represented yet";
+        document.getElementById("overview-cellar-bottles").textContent = collectionTotal;
         showProfile(activeTonightProfile);
         selectMapRegion(selectedMapRegion);
       }
@@ -1415,7 +1448,7 @@
               <div class="wine-card-foot">
                 <p>Purchased ${wine.purchase}<br>Current ${wine.market}</p>
                 <div class="wine-card-actions">
-                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}.">Full details</button>
+                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
                   <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
                 </div>
               </div>
@@ -1508,6 +1541,8 @@
       const mapValue = document.getElementById("map-value");
       const mapProducer = document.getElementById("map-producer");
       const viewRegionBottles = document.getElementById("view-region-bottles");
+      const readyRegionBottles = document.getElementById("ready-region-bottles");
+      const regionSummary = document.getElementById("region-summary");
       let selectedMapRegion = "Burgundy";
 
       function selectMapRegion(region) {
@@ -1518,14 +1553,21 @@
         const averageScore = regionWines.length
           ? (regionWines.reduce((total, wine) => total + Number(wine.score), 0) / regionWines.length).toFixed(1)
           : "-";
-        mapNodes.forEach((node) => node.classList.toggle("active", node.dataset.region === region));
+        mapNodes.forEach((node) => {
+          const nodeWines = collectionBottles.filter((wine) => wine.region.includes(node.dataset.region));
+          const nodeCount = nodeWines.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+          node.classList.toggle("active", node.dataset.region === region);
+          node.querySelector("span").textContent = `${nodeCount} bottle${nodeCount === 1 ? "" : "s"}`;
+        });
         mapRegionName.textContent = region;
         mapBottles.textContent = bottleCount;
         mapReady.textContent = readyCount;
         mapScore.textContent = averageScore;
         mapValue.textContent = regionWines.length ? "Researching" : "-";
-        mapProducer.textContent = regionWines[0]?.producer || "None yet";
+        const topWine = regionWines.slice().sort((a, b) => Number(b.score) - Number(a.score))[0];
+        mapProducer.textContent = topWine ? `${topWine.vintage} ${topWine.producer}` : "None yet";
         viewRegionBottles.textContent = `View ${region} bottles`;
+        readyRegionBottles.textContent = `Ready in ${region}`;
       }
 
       mapNodes.forEach((node) => node.addEventListener("click", () => selectMapRegion(node.dataset.region)));
@@ -1534,25 +1576,64 @@
         renderCollection();
         document.getElementById("my-collection").scrollIntoView({ behavior: "smooth" });
       });
+      readyRegionBottles.addEventListener("click", () => {
+        collectionRegion.value = selectedMapRegion;
+        renderCollection();
+        openActionModal(
+          `Ready in ${selectedMapRegion}`,
+          collectionBottles.filter((wine) => wine.region.includes(selectedMapRegion) && /peak/i.test(wine.maturity)).length
+            ? collectionBottles.filter((wine) => wine.region.includes(selectedMapRegion) && /peak/i.test(wine.maturity)).map((wine) => `${wine.vintage} ${wine.producer} ${wine.wine}`).join(". ")
+            : `No bottles from ${selectedMapRegion} are marked ready right now.`
+        );
+      });
+      regionSummary.addEventListener("click", () => {
+        const regionWines = collectionBottles.filter((wine) => wine.region.includes(selectedMapRegion));
+        const bottleCount = regionWines.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+        const topWine = regionWines.slice().sort((a, b) => Number(b.score) - Number(a.score))[0];
+        openActionModal(
+          `${selectedMapRegion} summary`,
+          regionWines.length
+            ? `${activeCellarName} has ${bottleCount} bottle${bottleCount === 1 ? "" : "s"} from ${selectedMapRegion}. The highest scoring card is ${topWine.vintage} ${topWine.producer} ${topWine.wine}.`
+            : `${activeCellarName} does not have bottles from ${selectedMapRegion} yet.`
+        );
+      });
 
       const profileForm = document.getElementById("profile-form");
       const profileFirstName = document.getElementById("profile-first-name");
+      const profileCellarName = document.getElementById("profile-cellar-name");
       const profileStatus = document.getElementById("profile-status");
       const welcomeName = document.getElementById("welcome-name");
+      const heroCellarName = document.getElementById("hero-cellar-name");
+      const overviewCellarName = document.getElementById("overview-cellar-name");
+      let activeCellarName = localStorage.getItem("cellar-profile-cellar-name") || "My Cellar";
+      function applyCellarName(name) {
+        activeCellarName = name;
+        profileCellarName.value = name;
+        heroCellarName.textContent = name;
+        overviewCellarName.textContent = name;
+      }
       const savedFirstName = localStorage.getItem("cellar-profile-first-name") || "";
       if (savedFirstName) {
         profileFirstName.value = savedFirstName;
         welcomeName.textContent = savedFirstName;
       }
+      applyCellarName(activeCellarName);
       profileForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const firstName = profileFirstName.value.trim();
+        const cellarName = profileCellarName.value.trim();
         if (!firstName) {
           profileStatus.textContent = "Enter your first name.";
           return;
         }
+        if (!cellarName) {
+          profileStatus.textContent = "Name your cellar.";
+          return;
+        }
         localStorage.setItem("cellar-profile-first-name", firstName);
+        localStorage.setItem("cellar-profile-cellar-name", cellarName);
         welcomeName.textContent = firstName;
+        applyCellarName(cellarName);
         profileStatus.textContent = "Profile saved.";
       });
 

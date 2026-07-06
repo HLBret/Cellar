@@ -53,6 +53,13 @@ type CollectionBottle = {
   service: string;
   note: string;
   accent: string;
+  confidence?: number;
+  recognitionSource?: string;
+  sources?: string[];
+  alternatives?: string[];
+  producerHistory?: string;
+  vintageSummary?: string;
+  foodPairing?: string;
 };
 
 const researchedWines: CollectionBottle[] = [
@@ -105,6 +112,27 @@ const regionalCollection = {
   "Santa Cruz": {}
 };
 
+type AiRecognition = {
+  producer: string;
+  wine: string;
+  vintage: string;
+  country: string;
+  region: string;
+  appellation: string;
+  grapes: string;
+  classification: string;
+  style: string;
+  confidence: number;
+  drinkingWindow: string;
+  service: string;
+  note: string;
+  producerHistory: string;
+  vintageSummary: string;
+  foodPairing: string;
+  sources: string[];
+  alternatives: string[];
+};
+
 type TonightProfile = {
   label: string;
   weather: string;
@@ -131,6 +159,44 @@ const weatherDescriptions: Record<number, string> = {
   82: "heavy showers",
   95: "thunderstorms"
 };
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function toCollectionBottle(recognition: AiRecognition): CollectionBottle {
+  return {
+    producer: recognition.producer || "Unknown producer",
+    wine: recognition.wine || "Unidentified wine",
+    vintage: recognition.vintage || "NV",
+    region: [recognition.region, recognition.country].filter(Boolean).join(", ") || "Region unknown",
+    appellation: recognition.appellation || "Appellation unknown",
+    grapes: recognition.grapes || "Grapes not confirmed",
+    classification: recognition.classification || recognition.style || "Wine",
+    cellar: "Location not set",
+    score: String(Math.round(Math.max(0, Math.min(100, recognition.confidence || 0)))),
+    window: recognition.drinkingWindow ? "Research suggested" : "Needs review",
+    drinkingWindow: recognition.drinkingWindow || "Confirm after identification",
+    quantity: "1 bottle",
+    purchase: "Not added",
+    market: "Researching",
+    service: recognition.service || "Confirm serving guidance",
+    note: recognition.note || "AI recognition completed, but tasting detail was limited.",
+    accent: "from-[#7a2832] to-[#34211d]",
+    confidence: recognition.confidence,
+    recognitionSource: "OpenAI Vision + structured wine research",
+    sources: recognition.sources,
+    alternatives: recognition.alternatives,
+    producerHistory: recognition.producerHistory,
+    vintageSummary: recognition.vintageSummary,
+    foodPairing: recognition.foodPairing
+  };
+}
 
 function profileForWeather(label: string, temperature: number, weatherCode: number): TonightProfile {
   const condition = weatherDescriptions[weatherCode] ?? "settled";
@@ -160,6 +226,9 @@ export default function Home() {
   const [bottleImagePreview, setBottleImagePreview] = useState("");
   const [bottleIntent, setBottleIntent] = useState<"collection" | "checking">("collection");
   const [researchIndex, setResearchIndex] = useState(-1);
+  const [recognizedBottle, setRecognizedBottle] = useState<CollectionBottle | null>(null);
+  const [recognitionStatus, setRecognitionStatus] = useState("Upload or take a photo to identify the bottle");
+  const [isRecognizing, setIsRecognizing] = useState(false);
   const [activeDialog, setActiveDialog] = useState<{ title: string; body: string; confirmLabel?: string; onConfirm?: () => void } | null>(null);
   const [favoriteBottles, setFavoriteBottles] = useState<string[]>([]);
   const [collectionBottles, setCollectionBottles] = useState<CollectionBottle[]>([]);
@@ -174,9 +243,11 @@ export default function Home() {
   ]);
   const [firstName, setFirstName] = useState("First_Name");
   const [profileFirstName, setProfileFirstName] = useState("");
+  const [cellarName, setCellarName] = useState("My Cellar");
+  const [profileCellarName, setProfileCellarName] = useState("My Cellar");
   const [profileStatus, setProfileStatus] = useState("");
   const [scannerTarget, setScannerTarget] = useState<HTMLElement | null>(null);
-  const researchedBottle = researchedWines[Math.max(researchIndex, 0)];
+  const researchedBottle = recognizedBottle ?? researchedWines[Math.max(researchIndex, 0)];
   const tonight = liveTonight ?? {
     label: "",
     weather: "Location not set"
@@ -207,6 +278,10 @@ export default function Home() {
   const selectedRegionScore = selectedRegionBottles.length
     ? (selectedRegionBottles.reduce((total, bottle) => total + Number(bottle.score), 0) / selectedRegionBottles.length).toFixed(1)
     : "-";
+  const selectedRegionTopBottle = selectedRegionBottles
+    .slice()
+    .sort((a, b) => Number(b.score) - Number(a.score))[0];
+  const selectedRegionReadyBottles = selectedRegionBottles.filter((bottle) => /peak/i.test(bottle.window));
 
   useEffect(() => {
     setScannerTarget(document.getElementById("hero-scanner-slot"));
@@ -220,36 +295,75 @@ export default function Home() {
         setFirstName(savedFirstName);
         setProfileFirstName(savedFirstName);
       }
+      const savedCellarName = localStorage.getItem("cellar-profile-cellar-name") ?? "";
+      if (savedCellarName) {
+        setCellarName(savedCellarName);
+        setProfileCellarName(savedCellarName);
+      }
     } catch {
       setCollectionBottles([]);
     }
   }, []);
 
-  function handleBottleImage(file?: File) {
+  async function handleBottleImage(file?: File) {
     if (!file) return;
+    setRecognizedBottle(null);
+    setRecognitionStatus("Reading label with AI recognition...");
+    setIsRecognizing(true);
+    setResearchIndex(-1);
     const fileLabel = file.name.toLowerCase();
-    const matchedIndex = researchedWines.findIndex((wine) =>
-      fileLabel.includes(wine.producer.split(" ")[0].toLowerCase()) ||
-      fileLabel.includes(wine.wine.split(" ")[0].toLowerCase())
-    );
-    setResearchIndex((current) => matchedIndex >= 0 ? matchedIndex : (current + 1) % researchedWines.length);
     setBottleImageName(file.name);
     setBottleImagePreview(URL.createObjectURL(file));
+
+    try {
+      const image = await fileToDataUrl(file);
+      const response = await fetch("/api/recognize-wine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image })
+      });
+      if (!response.ok) throw new Error("AI recognition unavailable");
+      const recognition = await response.json() as AiRecognition;
+      setRecognizedBottle(toCollectionBottle(recognition));
+      setRecognitionStatus(`AI match: ${recognition.vintage} ${recognition.producer} (${Math.round(recognition.confidence)}% confidence)`);
+      setIsRecognizing(false);
+      return;
+    } catch {
+      const matchedIndex = researchedWines.findIndex((wine) =>
+        fileLabel.includes(wine.producer.split(" ")[0].toLowerCase()) ||
+        fileLabel.includes(wine.wine.split(" ")[0].toLowerCase()) ||
+        fileLabel.includes(wine.region.split(",")[0].toLowerCase())
+      );
+      const fallbackIndex = matchedIndex >= 0 ? matchedIndex : 0;
+      setResearchIndex(fallbackIndex);
+      setRecognitionStatus("AI source unavailable. Showing best local research fallback.");
+      setIsRecognizing(false);
+    }
   }
 
   function refreshIdentification() {
     if (!bottleImagePreview) return;
+    setRecognizedBottle(null);
     setResearchIndex((current) => (current + 1) % researchedWines.length);
+    setRecognitionStatus("Refreshed local candidate match.");
+    setIsRecognizing(false);
   }
 
   function saveProfile() {
-    const value = profileFirstName.trim();
-    if (!value) {
+    const nameValue = profileFirstName.trim();
+    const cellarValue = profileCellarName.trim();
+    if (!nameValue) {
       setProfileStatus("Enter your first name.");
       return;
     }
-    localStorage.setItem("cellar-profile-first-name", value);
-    setFirstName(value);
+    if (!cellarValue) {
+      setProfileStatus("Name your cellar.");
+      return;
+    }
+    localStorage.setItem("cellar-profile-first-name", nameValue);
+    localStorage.setItem("cellar-profile-cellar-name", cellarValue);
+    setFirstName(nameValue);
+    setCellarName(cellarValue);
     setProfileStatus("Profile saved.");
   }
 
@@ -332,7 +446,7 @@ export default function Home() {
       const quantity = Number.parseInt(next[existing].quantity, 10) + 1;
       next[existing] = { ...next[existing], quantity: `${quantity} bottles` };
     } else {
-      next.push(researchedBottle);
+      next.push({ ...researchedBottle, cellar: cellarName });
     }
     persistCollection(next);
   }
@@ -458,7 +572,7 @@ export default function Home() {
                 <div>
                   <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-cellar-gold/40 bg-white/8 px-3 py-2 text-sm text-cellar-cream/85">
                     <Sparkles className="size-4 text-cellar-gold" aria-hidden />
-                    Entering the west cellar
+                    Entering {cellarName}
                   </div>
                   <h1 className="max-w-2xl font-serif text-5xl leading-[0.95] tracking-normal text-white sm:text-7xl">
                     Welcome back, {firstName}.
@@ -612,7 +726,7 @@ export default function Home() {
             </a>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid gap-4">
             <section className="rounded-lg bg-white/70 p-5 shadow-soft">
               <div className="grid gap-3 sm:grid-cols-4">
                 {[
@@ -627,37 +741,33 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {[
-                  ["West cellar", "0 bottles", "No bottles assigned"],
-                  ["Wine fridge", "0 bottles", "No bottles assigned"],
-                  ["Offsite storage", "0 bottles", "No bottles assigned"]
-                ].map(([zone, count, detail]) => (
-                  <article className="rounded-md border border-cellar-oak/18 bg-white/72 p-4" key={zone}>
-                    <h3 className="font-serif text-2xl">{zone}</h3>
-                    <p className="mt-2 font-medium text-burgundy-700">{count}</p>
-                    <p className="mt-2 text-sm leading-6 text-cellar-walnut">{detail}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-lg bg-burgundy-900 p-5 text-cellar-cream shadow-cellar">
-              <p className="text-xs uppercase tracking-[0.18em] text-cellar-gold">Collection pulse</p>
-              <h3 className="mt-2 font-serif text-3xl text-white">What is happening now</h3>
-              <div className="mt-5 space-y-3">
-                {[
-                  ["Ready to open", `${readyCount} bottles are in their recommended window`],
-                  ["Entering peak", collectionTotal ? "Review your researched drinking windows" : "Add a bottle to begin tracking maturity"],
-                  ["Needs attention", "0 bottles are past the ideal drinking range"],
-                  ["Most represented", collectionTotal ? collectionBottles[0].region : "No regions represented yet"]
-                ].map(([title, detail]) => (
-                  <div className="rounded-md bg-white/8 p-4" key={title}>
-                    <p className="font-medium text-white">{title}</p>
-                    <p className="mt-1 text-sm text-cellar-cream/68">{detail}</p>
+              <article className="mt-5 rounded-md border border-cellar-oak/18 bg-white/72 p-5">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div>
+                    <h3 className="font-serif text-3xl">{cellarName}</h3>
+                    <p className="mt-2 text-sm leading-6 text-cellar-walnut">
+                      One private cellar for every bottle, vintage, tasting note, and storage detail.
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <a href="#settings" className="inline-flex w-fit items-center gap-2 rounded-md border border-cellar-oak/20 px-3 py-2 text-sm font-medium text-burgundy-700">
+                    Rename cellar <Settings className="size-4" aria-hidden />
+                  </a>
+                </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-md bg-cellar-parchment p-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">Ready now</p>
+                    <p className="mt-2 font-serif text-3xl">{readyCount}</p>
+                  </div>
+                  <div className="rounded-md bg-cellar-parchment p-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">Regions</p>
+                    <p className="mt-2 font-serif text-3xl">{new Set(collectionBottles.map((bottle) => bottle.region)).size}</p>
+                  </div>
+                  <div className="rounded-md bg-cellar-parchment p-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">Most represented</p>
+                    <p className="mt-2 font-medium">{collectionTotal ? collectionBottles[0].region : "None yet"}</p>
+                  </div>
+                </div>
+              </article>
             </section>
           </div>
         </div>
@@ -672,7 +782,7 @@ export default function Home() {
                 className="grid size-9 place-items-center rounded-md bg-cellar-cream text-burgundy-700 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Refresh wine identification"
                 title="Refresh identification"
-                disabled={!bottleImagePreview}
+                disabled={!bottleImagePreview || isRecognizing}
                 onClick={refreshIdentification}
               >
                 <RefreshCw className="size-4" aria-hidden />
@@ -751,11 +861,9 @@ export default function Home() {
 
               <div className="space-y-3">
                 <div className="rounded-md bg-burgundy-50 px-4 py-3 text-sm font-medium text-burgundy-900">
-                  {bottleImagePreview
-                    ? bottleIntent === "collection" ? "Ready to identify and add to your collection" : "Ready to identify without saving"
-                    : "Upload or take a photo to identify the bottle"}
+                  {recognitionStatus}
                 </div>
-                {(researchIndex < 0 ? [["Identification", "Awaiting photo"]] : [
+                {(researchIndex < 0 && !recognizedBottle ? [["Identification", "Awaiting photo"]] : [
                   ["Producer", researchedBottle.producer],
                   ["Wine", researchedBottle.wine],
                   ["Vintage", researchedBottle.vintage],
@@ -763,9 +871,15 @@ export default function Home() {
                   ["Appellation", researchedBottle.appellation],
                   ["Grapes", researchedBottle.grapes],
                   ["Classification", researchedBottle.classification],
+                  ["Confidence", researchedBottle.confidence ? `${Math.round(researchedBottle.confidence)}%` : "Local research match"],
+                  ["Sources", researchedBottle.sources?.join(" / ") ?? researchedBottle.recognitionSource ?? "Curated Cellar fallback"],
                   ["Drinking window", researchedBottle.drinkingWindow],
                   ["Serving", researchedBottle.service],
-                  ["Tasting notes", researchedBottle.note]
+                  ["Tasting notes", researchedBottle.note],
+                  ["Producer notes", researchedBottle.producerHistory ?? "Available when AI recognition is connected"],
+                  ["Vintage notes", researchedBottle.vintageSummary ?? "Available when AI recognition is connected"],
+                  ["Pairing", researchedBottle.foodPairing ?? "Available when AI recognition is connected"],
+                  ["Other likely matches", researchedBottle.alternatives?.join(" / ") ?? "None shown"]
                 ]).map(([label, value]) => (
                   <div className="flex items-center justify-between rounded-md bg-white/78 px-4 py-3" key={label}>
                     <span className="text-sm text-cellar-walnut">{label}</span>
@@ -774,7 +888,7 @@ export default function Home() {
                 ))}
                 <button
                   className="w-full rounded-md bg-burgundy-700 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-45"
-                  disabled={!bottleImagePreview}
+                  disabled={!bottleImagePreview || isRecognizing || (researchIndex < 0 && !recognizedBottle)}
                   onClick={() => {
                     if (bottleIntent === "collection") saveResearchedBottle();
                     showDialog(
@@ -785,7 +899,7 @@ export default function Home() {
                     );
                   }}
                 >
-                  {bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving"}
+                  {isRecognizing ? "Researching bottle..." : bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving"}
                 </button>
               </div>
             </div>
@@ -893,7 +1007,10 @@ export default function Home() {
                     <div className="flex shrink-0 gap-2">
                       <button
                         className="rounded-md bg-cellar-ink px-3 py-2 text-sm font-medium text-white"
-                        onClick={() => showDialog(`${bottle.vintage} ${bottle.producer}`, `${bottle.wine}. ${bottle.note} ${bottle.grapes}; ${bottle.appellation}. Drinking window ${bottle.drinkingWindow}. Store at ${bottle.cellar}. You own ${bottle.quantity}. Serve ${bottle.service}.`)}
+                        onClick={() => showDialog(
+                          `${bottle.vintage} ${bottle.producer}`,
+                          `${bottle.wine}. ${bottle.note} ${bottle.grapes}; ${bottle.appellation}. Drinking window ${bottle.drinkingWindow}. Store at ${bottle.cellar}. You own ${bottle.quantity}. Serve ${bottle.service}. ${bottle.producerHistory ?? ""} ${bottle.vintageSummary ?? ""} ${bottle.foodPairing ? `Pairing: ${bottle.foodPairing}` : ""}`.trim()
+                        )}
                       >
                         Full details
                       </button>
@@ -948,19 +1065,29 @@ export default function Home() {
           </Panel>
 
           <Panel dark title="Regional Map" eyebrow="Collection geography" icon={<Map className="size-5" />} id="regional-map">
-            <div className="grid gap-4 sm:grid-cols-[1.1fr_0.9fr]">
-              <div className="relative min-h-72 rounded-lg bg-[radial-gradient(circle_at_44%_45%,rgba(199,162,90,0.40),transparent_18%),radial-gradient(circle_at_58%_38%,rgba(143,29,58,0.56),transparent_14%),linear-gradient(135deg,#293532,#111)]">
-                {(Object.keys(regionalCollection) as Array<keyof typeof regionalCollection>).map((region, index) => (
+            <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="relative min-h-[360px] overflow-hidden rounded-lg border border-cellar-gold/20 bg-[radial-gradient(circle_at_22%_25%,rgba(199,162,90,0.30),transparent_16%),radial-gradient(circle_at_45%_42%,rgba(143,29,58,0.55),transparent_14%),radial-gradient(circle_at_74%_66%,rgba(91,112,85,0.45),transparent_16%),linear-gradient(135deg,#303b36,#111)] p-4">
+                <div className="absolute inset-x-6 top-6 h-px bg-cellar-gold/20" />
+                <div className="absolute bottom-6 left-8 right-8 h-px bg-cellar-gold/20" />
+                <div className="absolute bottom-10 left-1/3 top-10 w-px bg-cellar-gold/20" />
+                <div className="absolute bottom-12 right-1/4 top-14 w-px bg-cellar-gold/20" />
+                {(Object.keys(regionalCollection) as Array<keyof typeof regionalCollection>).map((region, index) => {
+                  const regionCount = collectionBottles
+                    .filter((bottle) => bottle.region.includes(region))
+                    .reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+                  return (
                   <button
-                    className={`absolute rounded-full px-2 py-1 text-xs font-medium transition ${selectedMapRegion === region ? "bg-white text-burgundy-900 ring-2 ring-cellar-gold" : "bg-cellar-gold text-cellar-ink"}`}
+                    className={`absolute min-w-24 rounded-md border px-3 py-2 text-left text-xs font-medium shadow-soft transition ${selectedMapRegion === region ? "border-cellar-gold bg-white text-burgundy-900 ring-2 ring-cellar-gold" : "border-white/20 bg-cellar-gold text-cellar-ink hover:bg-white"}`}
                     key={region}
-                    style={{ left: `${18 + index * 13}%`, top: `${28 + (index % 3) * 18}%` }}
+                    style={{ left: `${12 + index * 15}%`, top: `${22 + (index % 3) * 20}%` }}
                     onClick={() => setSelectedMapRegion(region)}
                     aria-pressed={selectedMapRegion === region}
                   >
-                    {region}
+                    <span className="flex items-center gap-1"><MapPin className="size-3" aria-hidden /> {region}</span>
+                    <span className="mt-1 block text-[11px] opacity-75">{regionCount} bottles</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
               <div className="space-y-3">
                 <div className="rounded-md border border-cellar-gold/25 bg-white/10 p-5">
@@ -972,7 +1099,8 @@ export default function Home() {
                     <div><p className="text-cellar-cream/55">Average score</p><p className="mt-1 font-medium text-white">{selectedRegionScore}</p></div>
                     <div><p className="text-cellar-cream/55">Collection value</p><p className="mt-1 font-medium text-white">{selectedRegionBottles.length ? "Researching" : "-"}</p></div>
                   </div>
-                  <p className="mt-4 text-sm text-cellar-cream/65">Most owned: {selectedRegionBottles[0]?.producer ?? "None yet"}</p>
+                  <p className="mt-4 text-sm text-cellar-cream/65">Top bottle: {selectedRegionTopBottle ? `${selectedRegionTopBottle.vintage} ${selectedRegionTopBottle.producer}` : "None yet"}</p>
+                  <p className="mt-2 text-sm text-cellar-cream/65">Ready now: {selectedRegionReadyBottles.length ? selectedRegionReadyBottles.map((bottle) => `${bottle.vintage} ${bottle.producer}`).join(", ") : "No bottles ready in this region yet"}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.keys(regionalCollection) as Array<keyof typeof regionalCollection>).map((region) => (
@@ -985,16 +1113,40 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-cellar-gold px-3 py-3 text-sm font-medium text-cellar-ink"
+                    onClick={() => {
+                      setCollectionRegion(selectedMapRegion);
+                      document.getElementById("my-collection")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                  >
+                    <Search className="size-4" aria-hidden />
+                    View bottles
+                  </button>
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-white/10 px-3 py-3 text-sm font-medium text-white hover:bg-white/15"
+                    onClick={() => showDialog(
+                      `${selectedMapRegion} summary`,
+                      selectedRegionBottles.length
+                        ? `${cellarName} has ${selectedRegionTotal} bottle${selectedRegionTotal === 1 ? "" : "s"} from ${selectedMapRegion}. Average score is ${selectedRegionScore}. ${selectedRegionTopBottle ? `The strongest card is ${selectedRegionTopBottle.vintage} ${selectedRegionTopBottle.producer} ${selectedRegionTopBottle.wine}.` : ""}`
+                        : `${cellarName} does not have bottles from ${selectedMapRegion} yet.`
+                    )}
+                  >
+                    <Sparkles className="size-4" aria-hidden />
+                    Region summary
+                  </button>
+                </div>
               </div>
             </div>
             <button
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-cellar-gold px-4 py-2 text-sm font-medium text-cellar-ink"
+              className="mt-4 inline-flex items-center gap-2 rounded-md border border-cellar-gold/25 px-4 py-2 text-sm font-medium text-cellar-cream hover:bg-white/10"
               onClick={() => {
-                setCollectionRegion(selectedMapRegion);
+                setCollectionRegion("All regions");
                 document.getElementById("my-collection")?.scrollIntoView({ behavior: "smooth" });
               }}
             >
-              View {selectedMapRegion} bottles <ChevronRight className="size-4" aria-hidden />
+              View all regions <ChevronRight className="size-4" aria-hidden />
             </button>
           </Panel>
         </div>
@@ -1025,7 +1177,7 @@ export default function Home() {
           <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Profile & Settings</p>
           <h2 className="mt-2 font-serif text-4xl">Your Cellar profile</h2>
           <form
-            className="mt-5 grid max-w-lg gap-2 sm:grid-cols-[1fr_auto]"
+            className="mt-5 grid max-w-3xl gap-2 sm:grid-cols-[1fr_1fr_auto]"
             onSubmit={(event) => {
               event.preventDefault();
               saveProfile();
@@ -1038,6 +1190,13 @@ export default function Home() {
               placeholder="First name"
               autoComplete="given-name"
               aria-label="First name"
+            />
+            <input
+              className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+              value={profileCellarName}
+              onChange={(event) => setProfileCellarName(event.target.value)}
+              placeholder="Cellar name"
+              aria-label="Cellar name"
             />
             <button className="rounded-md bg-burgundy-700 px-5 py-3 text-sm font-medium text-white" type="submit">Save profile</button>
           </form>
