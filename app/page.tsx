@@ -15,6 +15,7 @@ import {
   MapPin,
   Menu,
   MessageCircle,
+  Plus,
   ScanLine,
   Search,
   Send,
@@ -625,6 +626,14 @@ export default function Home() {
             <a href="#add-bottle" className="hidden items-center gap-2 rounded-md bg-burgundy-700 px-4 py-2 text-sm font-medium text-white shadow-soft transition hover:bg-burgundy-900 sm:inline-flex">
               <Camera className="size-4" aria-hidden />
               Add Bottle
+            </a>
+            <a
+              href="#add-bottle"
+              className="grid size-11 place-items-center rounded-md bg-burgundy-700 text-white shadow-soft transition hover:bg-burgundy-900 sm:hidden"
+              aria-label="Identify a new bottle"
+              title="Identify a new bottle"
+            >
+              <Plus className="size-5" aria-hidden />
             </a>
             <details className="group relative">
               <summary className="grid size-11 cursor-pointer list-none place-items-center rounded-md bg-cellar-ink text-cellar-cream shadow-soft transition hover:bg-burgundy-900 [&::-webkit-details-marker]:hidden" aria-label="Open menu">
