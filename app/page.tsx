@@ -183,12 +183,35 @@ const weatherDescriptions: Record<number, string> = {
   95: "thunderstorms"
 };
 
-function fileToDataUrl(file: File) {
+function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
+  });
+}
+
+async function fileToDataUrl(file: File) {
+  const original = await readFileAsDataUrl(file);
+  return new Promise<string>((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const maxDimension = 1600;
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(original);
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.84));
+    };
+    image.onerror = () => resolve(original);
+    image.src = original;
   });
 }
 
@@ -341,12 +364,15 @@ export default function Home() {
     setBottleImageName(file.name);
     setBottleImagePreview(URL.createObjectURL(file));
 
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 70000);
     try {
       const image = await fileToDataUrl(file);
       const response = await fetch("/api/recognize-wine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image })
+        body: JSON.stringify({ image }),
+        signal: controller.signal
       });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: "AI recognition unavailable." })) as { error?: string };
@@ -355,12 +381,17 @@ export default function Home() {
       const recognition = await response.json() as AiRecognition;
       setRecognizedBottle(toCollectionBottle(recognition));
       setRecognitionStatus(`ChatGPT Vision match: ${recognition.vintage} ${recognition.producer}`);
-      setIsRecognizing(false);
       return;
     } catch (error) {
       console.error("Cellar bottle recognition failed:", error);
       setResearchIndex(-1);
-      setRecognitionStatus("We could not identify this bottle. Try another photo.");
+      setRecognitionStatus(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Recognition took too long. Try a closer label photo."
+          : "We could not identify this bottle. Try another photo."
+      );
+    } finally {
+      window.clearTimeout(timeout);
       setIsRecognizing(false);
     }
   }

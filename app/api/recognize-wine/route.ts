@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60;
+
 type WineRecognition = {
   producer: string;
   wine: string;
@@ -119,6 +121,7 @@ export async function POST(request: Request) {
   try {
     response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
+      signal: AbortSignal.timeout(55000),
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
