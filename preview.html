@@ -1141,7 +1141,7 @@
       ];
 
       function currentResearchedWine() {
-        return researchedWines[Math.max(currentResearchIndex, 0)];
+        return currentResearchIndex >= 0 ? researchedWines[currentResearchIndex] : null;
       }
 
       function renderRecognition() {
@@ -1150,6 +1150,10 @@
           return;
         }
         const wine = currentResearchedWine();
+        if (!wine) {
+          recognitionDetails.innerHTML = '<div class="row"><span>Identification</span><strong>AI recognition unavailable in file preview</strong></div>';
+          return;
+        }
         const details = [
           ["Producer", wine.producer], ["Wine", wine.wine], ["Vintage", wine.vintage], ["Region", wine.region],
           ["Appellation", wine.appellation], ["Grapes", wine.grapes], ["Classification", wine.classification],
@@ -1165,9 +1169,9 @@
 
       function refreshWineIdentification() {
         if (!bottlePhotoReady) return;
-        currentResearchIndex = (currentResearchIndex + 1) % researchedWines.length;
+        currentResearchIndex = -1;
         renderRecognition();
-        recognitionStatus.textContent = `Updated candidate: ${currentResearchedWine().vintage} ${currentResearchedWine().producer} · ${currentResearchedWine().confidence}% confidence`;
+        recognitionStatus.textContent = "Upload-only recognition requires the OpenAI-backed app server, not the local file preview.";
       }
 
       function updateBottleIntent() {
@@ -1178,26 +1182,25 @@
         });
         identifyAction.textContent = bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving";
         if (bottlePhotoReady) {
+          const wine = currentResearchedWine();
           recognitionStatus.textContent = bottleIntent === "collection"
-            ? `Best preview match ready: ${currentResearchedWine().producer}`
-            : `Preview research ready: ${currentResearchedWine().producer}`;
+            ? wine ? `Preview research ready: ${wine.producer}` : "Photo added. AI recognition requires the OpenAI-backed app server."
+            : wine ? `Preview research ready: ${wine.producer}` : "Photo added. AI recognition requires the OpenAI-backed app server.";
         }
       }
 
       function handleBottleFile(file) {
         if (!file) return;
         bottlePhotoReady = true;
-        const fileLabel = file.name.toLowerCase();
-        const matchedIndex = researchedWines.findIndex((wine) => fileLabel.includes(wine.producer.split(" ")[0].toLowerCase()) || fileLabel.includes(wine.wine.split(" ")[0].toLowerCase()));
-        currentResearchIndex = matchedIndex >= 0 ? matchedIndex : 0;
+        currentResearchIndex = -1;
         fileName.textContent = file.name;
         previewImage.src = URL.createObjectURL(file);
         previewImage.style.display = "block";
         emptyPhoto.style.display = "none";
-        identifyAction.disabled = false;
+        identifyAction.disabled = true;
         refreshIdentification.disabled = false;
         renderRecognition();
-        updateBottleIntent();
+        recognitionStatus.textContent = "Photo uploaded. To recognize from the image only, open the deployed app with OpenAI Vision enabled.";
       }
 
       scanChoices.forEach((choice) => {
@@ -1207,7 +1210,7 @@
         });
       });
       identifyAction.addEventListener("click", () => {
-        if (!bottlePhotoReady) return;
+        if (!bottlePhotoReady || !currentResearchedWine()) return;
         if (bottleIntent === "collection") saveResearchedBottle();
         const researchedBottle = currentResearchedWine();
         openActionModal(
@@ -1382,6 +1385,7 @@
 
       function saveResearchedBottle() {
         const researchedBottle = currentResearchedWine();
+        if (!researchedBottle) return;
         const key = `${researchedBottle.producer}-${researchedBottle.vintage}`;
         const existing = collectionBottles.findIndex((wine) => `${wine.producer}-${wine.vintage}` === key);
         if (existing >= 0) {

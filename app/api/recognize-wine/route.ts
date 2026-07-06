@@ -14,6 +14,7 @@ type WineRecognition = {
   drinkingWindow: string;
   service: string;
   note: string;
+  tastingNotes: string[];
   producerHistory: string;
   vintageSummary: string;
   foodPairing: string;
@@ -38,6 +39,10 @@ const schema = {
     drinkingWindow: { type: "string" },
     service: { type: "string" },
     note: { type: "string" },
+    tastingNotes: {
+      type: "array",
+      items: { type: "string" }
+    },
     producerHistory: { type: "string" },
     vintageSummary: { type: "string" },
     foodPairing: { type: "string" },
@@ -45,33 +50,38 @@ const schema = {
     alternatives: { type: "array", items: { type: "string" } }
   },
   required: [
-    "producer",
-    "wine",
-    "vintage",
-    "country",
-    "region",
-    "appellation",
-    "grapes",
-    "classification",
-    "style",
-    "confidence",
-    "drinkingWindow",
-    "service",
-    "note",
-    "producerHistory",
-    "vintageSummary",
-    "foodPairing",
-    "sources",
-    "alternatives"
+    "producer", "wine", "vintage", "country", "region", "appellation",
+    "grapes", "classification", "style", "confidence", "drinkingWindow",
+    "service", "note", "tastingNotes", "producerHistory", "vintageSummary", "foodPairing",
+    "sources", "alternatives"
   ]
 };
 
+function getOpenAiErrorMessage(errorText: string) {
+  try {
+    const parsed = JSON.parse(errorText) as { error?: { message?: string } };
+    return parsed.error?.message ?? errorText;
+  } catch {
+    return errorText;
+  }
+}
+
+function getResponseText(data: {
+  output_text?: string;
+  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+}) {
+  if (data.output_text) return data.output_text;
+  return data.output
+    ?.flatMap((item) => item.content ?? [])
+    .find((part) => part.type === "output_text")
+    ?.text;
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_WINE_MODEL ?? "gpt-5.5";
   if (!apiKey) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY is not configured. Using local recognition fallback." },
+      { error: "OpenAI recognition is not configured. Add OPENAI_API_KEY to .env.local, then restart Cellar." },
       { status: 501 }
     );
   }
@@ -80,53 +90,91 @@ export async function POST(request: Request) {
   if (!image) {
     return NextResponse.json({ error: "A bottle image is required." }, { status: 400 });
   }
+  if (!/^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(image)) {
+    return NextResponse.json(
+      { error: "Cellar needs a JPEG, PNG, or WebP bottle image." },
+      { status: 400 }
+    );
+  }
 
   const prompt = [
-    "You are Cellar's wine recognition engine.",
-    "Identify the wine bottle or label in the image and return structured cellar data.",
-    "If the label is unclear, give the most likely match, lower the confidence, and include likely alternatives.",
-    "Do not invent a critic score or market value. Focus on producer, cuvee, vintage, region, grapes, service, maturity, tasting notes, and food pairings.",
-    "Sources should describe the source type used, such as 'OpenAI Vision label reading' or 'general wine knowledge'."
+    "You are Cellar's meticulous wine bottle identification engine.",
+    "Inspect the original bottle or label image at high detail.",
+    "Read the producer, exact cuvee or wine name, vintage, appellation, region, classification, and visible label wording before using general wine knowledge.",
+    "Treat large display text as a possible wine name rather than automatically assuming it is the producer.",
+    "Check smaller script and estate text carefully for the producer or bottler.",
+    "Never replace an unfamiliar bottle with a famous or familiar wine.",
+    "If the exact identity is uncertain, state that clearly, set confidence below 60, and provide concise alternatives.",
+    "Do not invent critic scores, market prices, producer history, vintage facts, or grape composition.",
+    "Provide tasting notes, drinking window, service, and food pairing only when the identified wine supports them.",
+    "Return 8 to 14 concise one- or two-word aroma and flavor descriptors in tastingNotes, such as vanilla, tobacco, mushroom, citrus peel, or wet stone.",
+    "Sources must describe the evidence used, such as visible front-label text or general wine knowledge; do not claim to have searched a site."
   ].join(" ");
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
+  const model = process.env.OPENAI_WINE_MODEL ?? "gpt-5.4";
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        input: [{
           role: "user",
           content: [
             { type: "input_text", text: prompt },
-            { type: "input_image", image_url: image }
+            { type: "input_image", image_url: image, detail: "high" }
           ]
+        }],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "wine_recognition",
+            strict: true,
+            schema
+          }
         }
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "wine_recognition",
-          strict: true,
-          schema
-        }
-      }
-    })
-  });
+      })
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Cellar could not reach OpenAI. Check your internet connection and try again." },
+      { status: 502 }
+    );
+  }
 
   if (!response.ok) {
-    const error = await response.text();
-    return NextResponse.json({ error }, { status: response.status });
+    const message = getOpenAiErrorMessage(await response.text());
+    return NextResponse.json(
+      { error: `OpenAI could not identify this bottle: ${message}` },
+      { status: response.status }
+    );
   }
 
   const data = await response.json();
-  const output = data.output_text ? JSON.parse(data.output_text) as WineRecognition : null;
+  const responseText = getResponseText(data);
+  let output: WineRecognition | null = null;
+  try {
+    output = responseText ? JSON.parse(responseText) as WineRecognition : null;
+  } catch {
+    return NextResponse.json(
+      { error: "OpenAI returned an identification that Cellar could not read." },
+      { status: 502 }
+    );
+  }
   if (!output) {
-    return NextResponse.json({ error: "Recognition did not return structured wine data." }, { status: 502 });
+    return NextResponse.json(
+      { error: "OpenAI did not return a usable wine identification." },
+      { status: 502 }
+    );
   }
 
-  return NextResponse.json(output);
+  return NextResponse.json({
+    ...output,
+    sources: [...new Set(["OpenAI high-detail image interpretation", ...output.sources])],
+    recognitionProvider: "OpenAI"
+  });
 }

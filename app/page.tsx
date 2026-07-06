@@ -6,8 +6,6 @@ import {
   Camera,
   CloudSun,
   ChevronRight,
-  Clock3,
-  Compass,
   Grape,
   Heart,
   ImageIcon,
@@ -21,12 +19,9 @@ import {
   Search,
   Send,
   Settings,
-  ShieldCheck,
   Sparkles,
-  ThermometerSun,
   Trash2,
   Upload,
-  Utensils,
   Wine,
   RefreshCw,
   X
@@ -34,6 +29,36 @@ import {
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+
+type WineResearch = {
+  summary: string;
+  nose: string;
+  palate: string;
+  finish: string;
+  tastingNotes: string[];
+  communityRating: string;
+  communityConsensus: string;
+  criticScores: Array<{
+    source: string;
+    score: string;
+    note: string;
+  }>;
+  drinkWindow: {
+    start: string;
+    peak: string;
+    end: string;
+    status: string;
+    reason: string;
+  };
+  communityPairings: string[];
+  sommelierPairings: string[];
+  sources: Array<{
+    title: string;
+    url: string;
+    provider: string;
+  }>;
+  researchedAt?: string;
+};
 
 type CollectionBottle = {
   producer: string;
@@ -60,6 +85,8 @@ type CollectionBottle = {
   producerHistory?: string;
   vintageSummary?: string;
   foodPairing?: string;
+  tastingNotes?: string[];
+  research?: WineResearch;
 };
 
 const researchedWines: CollectionBottle[] = [
@@ -87,14 +114,6 @@ const researchedWines: CollectionBottle[] = [
     service: "18 C / 180 min decant", note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity.",
     accent: "from-[#7a2832] to-[#34211d]"
   }
-];
-
-const vintages = [
-  ["2015", "97", "Peak", "Rack A"],
-  ["2016", "98", "Hold", "Rack A"],
-  ["2017", "94", "Open", "Bin 07"],
-  ["2018", "97", "Soon", "Rack A"],
-  ["2019", "96", "Hold", "Fridge"]
 ];
 
 const windows = [
@@ -126,11 +145,13 @@ type AiRecognition = {
   drinkingWindow: string;
   service: string;
   note: string;
+  tastingNotes: string[];
   producerHistory: string;
   vintageSummary: string;
   foodPairing: string;
   sources: string[];
   alternatives: string[];
+  recognitionProvider?: string;
 };
 
 type TonightProfile = {
@@ -187,9 +208,10 @@ function toCollectionBottle(recognition: AiRecognition): CollectionBottle {
     market: "Researching",
     service: recognition.service || "Confirm serving guidance",
     note: recognition.note || "AI recognition completed, but tasting detail was limited.",
+    tastingNotes: recognition.tastingNotes,
     accent: "from-[#7a2832] to-[#34211d]",
     confidence: recognition.confidence,
-    recognitionSource: "OpenAI Vision + structured wine research",
+    recognitionSource: recognition.recognitionProvider || "OpenAI",
     sources: recognition.sources,
     alternatives: recognition.alternatives,
     producerHistory: recognition.producerHistory,
@@ -230,9 +252,11 @@ export default function Home() {
   const [recognitionStatus, setRecognitionStatus] = useState("Upload or take a photo to identify the bottle");
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [activeDialog, setActiveDialog] = useState<{ title: string; body: string; confirmLabel?: string; onConfirm?: () => void } | null>(null);
+  const [activeBottle, setActiveBottle] = useState<CollectionBottle | null>(null);
+  const [isResearchingBottle, setIsResearchingBottle] = useState(false);
+  const [bottleResearchError, setBottleResearchError] = useState("");
   const [favoriteBottles, setFavoriteBottles] = useState<string[]>([]);
   const [collectionBottles, setCollectionBottles] = useState<CollectionBottle[]>([]);
-  const [selectedVintage, setSelectedVintage] = useState("2018");
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionRegion, setCollectionRegion] = useState("All regions");
   const [collectionSort, setCollectionSort] = useState("producer");
@@ -308,10 +332,9 @@ export default function Home() {
   async function handleBottleImage(file?: File) {
     if (!file) return;
     setRecognizedBottle(null);
-    setRecognitionStatus("Reading label with AI recognition...");
+    setRecognitionStatus("Reading label with ChatGPT Vision...");
     setIsRecognizing(true);
     setResearchIndex(-1);
-    const fileLabel = file.name.toLowerCase();
     setBottleImageName(file.name);
     setBottleImagePreview(URL.createObjectURL(file));
 
@@ -322,21 +345,18 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image })
       });
-      if (!response.ok) throw new Error("AI recognition unavailable");
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "AI recognition unavailable." })) as { error?: string };
+        throw new Error(error.error ?? "AI recognition unavailable.");
+      }
       const recognition = await response.json() as AiRecognition;
       setRecognizedBottle(toCollectionBottle(recognition));
-      setRecognitionStatus(`AI match: ${recognition.vintage} ${recognition.producer} (${Math.round(recognition.confidence)}% confidence)`);
+      setRecognitionStatus(`ChatGPT Vision match: ${recognition.vintage} ${recognition.producer}`);
       setIsRecognizing(false);
       return;
-    } catch {
-      const matchedIndex = researchedWines.findIndex((wine) =>
-        fileLabel.includes(wine.producer.split(" ")[0].toLowerCase()) ||
-        fileLabel.includes(wine.wine.split(" ")[0].toLowerCase()) ||
-        fileLabel.includes(wine.region.split(",")[0].toLowerCase())
-      );
-      const fallbackIndex = matchedIndex >= 0 ? matchedIndex : 0;
-      setResearchIndex(fallbackIndex);
-      setRecognitionStatus("AI source unavailable. Showing best local research fallback.");
+    } catch (error) {
+      setResearchIndex(-1);
+      setRecognitionStatus(error instanceof Error ? error.message : "AI recognition unavailable.");
       setIsRecognizing(false);
     }
   }
@@ -344,8 +364,8 @@ export default function Home() {
   function refreshIdentification() {
     if (!bottleImagePreview) return;
     setRecognizedBottle(null);
-    setResearchIndex((current) => (current + 1) % researchedWines.length);
-    setRecognitionStatus("Refreshed local candidate match.");
+    setResearchIndex(-1);
+    setRecognitionStatus("Upload-only recognition refreshes automatically when you choose a new photo.");
     setIsRecognizing(false);
   }
 
@@ -434,7 +454,52 @@ export default function Home() {
     }
   }
 
+  async function openBottleDetails(bottle: CollectionBottle) {
+    setActiveBottle(bottle);
+    setBottleResearchError("");
+    setIsResearchingBottle(true);
+    try {
+      const response = await fetch("/api/research-wine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          producer: bottle.producer,
+          wine: bottle.wine,
+          vintage: bottle.vintage,
+          region: bottle.region,
+          appellation: bottle.appellation
+        })
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Live wine research is unavailable." })) as { error?: string };
+        throw new Error(error.error ?? "Live wine research is unavailable.");
+      }
+      const research = await response.json() as WineResearch;
+      const updatedBottle = {
+        ...bottle,
+        research,
+        note: research.summary || bottle.note,
+        drinkingWindow: research.drinkWindow.start && research.drinkWindow.end
+          ? `${research.drinkWindow.start}-${research.drinkWindow.end}`
+          : bottle.drinkingWindow,
+        window: research.drinkWindow.status || bottle.window,
+        foodPairing: [...research.communityPairings, ...research.sommelierPairings].join(", ") || bottle.foodPairing
+      };
+      setActiveBottle(updatedBottle);
+      persistCollection(collectionBottles.map((item) =>
+        item.producer === bottle.producer && item.wine === bottle.wine && item.vintage === bottle.vintage
+          ? updatedBottle
+          : item
+      ));
+    } catch (error) {
+      setBottleResearchError(error instanceof Error ? error.message : "Live wine research is unavailable.");
+    } finally {
+      setIsResearchingBottle(false);
+    }
+  }
+
   function saveResearchedBottle() {
+    if (researchIndex < 0 && !recognizedBottle) return;
     const key = `${researchedBottle.producer}-${researchedBottle.vintage}`;
     const existing = collectionBottles.findIndex((bottle) => `${bottle.producer}-${bottle.vintage}` === key);
     const next = [...collectionBottles];
@@ -772,7 +837,7 @@ export default function Home() {
       <section className="bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {scannerTarget && createPortal(
-          <Panel title="AI Bottle Recognition" eyebrow="Add Bottle" icon={<ScanLine className="size-5" />} id="add-bottle">
+          <Panel title="ChatGPT Bottle Recognition" eyebrow="Add Bottle" icon={<ScanLine className="size-5" />} id="add-bottle">
             <div className="-mt-16 mb-5 flex justify-end">
               <button
                 className="grid size-9 place-items-center rounded-md bg-cellar-cream text-burgundy-700 disabled:cursor-not-allowed disabled:opacity-40"
@@ -867,11 +932,8 @@ export default function Home() {
                   ["Appellation", researchedBottle.appellation],
                   ["Grapes", researchedBottle.grapes],
                   ["Classification", researchedBottle.classification],
-                  ["Confidence", researchedBottle.confidence ? `${Math.round(researchedBottle.confidence)}%` : "Local research match"],
-                  ["Sources", researchedBottle.sources?.join(" / ") ?? researchedBottle.recognitionSource ?? "Curated Cellar fallback"],
                   ["Drinking window", researchedBottle.drinkingWindow],
                   ["Serving", researchedBottle.service],
-                  ["Tasting notes", researchedBottle.note],
                   ["Producer notes", researchedBottle.producerHistory ?? "Available when AI recognition is connected"],
                   ["Vintage notes", researchedBottle.vintageSummary ?? "Available when AI recognition is connected"],
                   ["Pairing", researchedBottle.foodPairing ?? "Available when AI recognition is connected"],
@@ -882,9 +944,17 @@ export default function Home() {
                     <span className="text-right font-medium">{value}</span>
                   </div>
                 ))}
+                {researchedBottle.tastingNotes?.length ? (
+                  <div className="rounded-md bg-white/78 px-4 py-3">
+                    <p className="text-sm text-cellar-walnut">Tasting notes</p>
+                    <ul className="mt-2 grid list-disc grid-cols-2 gap-x-6 gap-y-1 pl-5 text-sm font-medium">
+                      {researchedBottle.tastingNotes.map((note) => <li key={note}>{note}</li>)}
+                    </ul>
+                  </div>
+                ) : null}
                 <button
                   className="w-full rounded-md bg-burgundy-700 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-45"
-                  disabled={!bottleImagePreview || isRecognizing || (researchIndex < 0 && !recognizedBottle)}
+                  disabled={isRecognizing || (researchIndex < 0 && !recognizedBottle)}
                   onClick={() => {
                     if (bottleIntent === "collection") saveResearchedBottle();
                     showDialog(
@@ -974,14 +1044,19 @@ export default function Home() {
                       <Heart className="size-4" fill={favoriteBottles.includes(bottle.producer) ? "currentColor" : "none"} aria-hidden />
                     </button>
                   </div>
-                  <span className="absolute bottom-4 right-4 rounded-md bg-white/90 px-2 py-1 text-sm font-bold text-cellar-ink">{bottle.score} pts</span>
                 </div>
 
                 <div className="p-5">
                   <p className="text-xs font-medium uppercase tracking-[0.14em] text-burgundy-700">{bottle.producer}</p>
                   <h3 className="mt-2 font-serif text-2xl leading-7">{bottle.wine}</h3>
                   <p className="mt-2 text-sm text-cellar-walnut">{bottle.appellation} / {bottle.classification}</p>
-                  <p className="mt-4 text-sm leading-6 text-cellar-walnut">{bottle.note}</p>
+                  {bottle.tastingNotes?.length ? (
+                    <ul className="mt-4 grid list-disc grid-cols-2 gap-x-5 gap-y-1 pl-5 text-sm leading-6 text-cellar-walnut">
+                      {bottle.tastingNotes.slice(0, 8).map((note) => <li key={note}>{note}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="mt-4 text-sm leading-6 text-cellar-walnut">{bottle.note}</p>
+                  )}
 
                   <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-cellar-oak/15 py-4 text-sm">
                     {[
@@ -1003,10 +1078,7 @@ export default function Home() {
                     <div className="flex shrink-0 gap-2">
                       <button
                         className="rounded-md bg-cellar-ink px-3 py-2 text-sm font-medium text-white"
-                        onClick={() => showDialog(
-                          `${bottle.vintage} ${bottle.producer}`,
-                          `${bottle.wine}. ${bottle.note} ${bottle.grapes}; ${bottle.appellation}. Drinking window ${bottle.drinkingWindow}. Store at ${bottle.cellar}. You own ${bottle.quantity}. Serve ${bottle.service}. ${bottle.producerHistory ?? ""} ${bottle.vintageSummary ?? ""} ${bottle.foodPairing ? `Pairing: ${bottle.foodPairing}` : ""}`.trim()
-                        )}
+                        onClick={() => void openBottleDetails(bottle)}
                       >
                         Full details
                       </button>
@@ -1036,30 +1108,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-cellar-night px-4 py-10 text-cellar-cream sm:px-6 lg:px-8" id="vintages">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <Panel dark title="Vintage Intelligence" eyebrow="Rousseau Clos Saint-Jacques" icon={<Clock3 className="size-5" />}>
-            <div className="grid grid-cols-5 gap-2">
-              {vintages.map(([year, score, status, value]) => (
-                <button
-                  className={`rounded-md border p-3 text-left transition ${selectedVintage === year ? "border-cellar-gold bg-white/16" : "border-white/10 bg-white/8 hover:bg-white/14"}`}
-                  key={year}
-                  aria-pressed={selectedVintage === year}
-                  onClick={() => setSelectedVintage(year)}
-                >
-                  <p className="font-serif text-2xl text-white">{year}</p>
-                  <p className="mt-2 text-sm">{score} pts</p>
-                  <p className="text-xs text-cellar-cream/58">{status}</p>
-                  <p className="mt-3 text-sm text-cellar-gold">{value}</p>
-                </button>
-              ))}
-            </div>
-            <p className="mt-5 leading-7 text-cellar-cream/72">
-              Selected vintage: {selectedVintage}. The 2018 is more aromatic and generous than 2016, with earlier
-              charm. Hold 2016 for structure; open 2017 for delicacy; revisit 2018 from 2029.
-            </p>
-          </Panel>
-
+      <section className="bg-cellar-night px-4 py-10 text-cellar-cream sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
           <Panel dark title="Regional Map" eyebrow="Collection geography" icon={<Map className="size-5" />} id="regional-map">
             <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
               <div className="relative min-h-[360px] overflow-hidden rounded-lg border border-cellar-gold/20 bg-[radial-gradient(circle_at_22%_25%,rgba(199,162,90,0.30),transparent_16%),radial-gradient(circle_at_45%_42%,rgba(143,29,58,0.55),transparent_14%),radial-gradient(circle_at_74%_66%,rgba(91,112,85,0.45),transparent_16%),linear-gradient(135deg,#303b36,#111)] p-4">
@@ -1148,26 +1198,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8" id="journal">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-4">
-          {[
-            [ThermometerSun, "Drinking Window", "Peak years, last recommended year, and plain-English aging logic."],
-            [Utensils, "Food Pairings", "Classic, vegetarian, holiday, cheese, and unexpected pairings."],
-            [Compass, "Drink Tonight", "A one-tap recommendation using dinner, guests, weather, and maturity."],
-            [ShieldCheck, "Cellar Management", "Rack, shelf, bin, storage locker, bottle status, and opening history."]
-          ].map(([Icon, title, body]) => {
-            const TypedIcon = Icon as typeof Grape;
-            return (
-              <div className="rounded-lg bg-white/78 p-5 shadow-soft" key={title as string}>
-                <TypedIcon className="size-6 text-burgundy-700" aria-hidden />
-                <h3 className="mt-4 font-serif text-2xl">{title as string}</h3>
-                <p className="mt-3 leading-6 text-cellar-walnut">{body as string}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       <section className="border-t border-cellar-oak/20 bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8" id="settings">
         <div className="mx-auto max-w-7xl">
           <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Profile & Settings</p>
@@ -1199,6 +1229,143 @@ export default function Home() {
           <p className="mt-2 min-h-5 text-sm text-cellar-walnut" role="status">{profileStatus}</p>
         </div>
       </section>
+
+      {activeBottle && (
+        <div className="fixed inset-0 z-[110] overflow-y-auto bg-cellar-night/75 p-3 backdrop-blur-sm sm:p-6" role="presentation" onClick={() => setActiveBottle(null)}>
+          <section
+            className="mx-auto my-3 w-full max-w-5xl rounded-lg bg-cellar-parchment shadow-cellar sm:my-8"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wine-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="flex items-start justify-between gap-4 border-b border-cellar-oak/20 p-5 sm:p-7">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">{activeBottle.vintage} / {activeBottle.region}</p>
+                <h2 className="mt-2 font-serif text-3xl sm:text-4xl" id="wine-detail-title">{activeBottle.producer}</h2>
+                <p className="mt-1 text-lg text-cellar-walnut">{activeBottle.wine}</p>
+              </div>
+              <button className="grid size-10 shrink-0 place-items-center rounded-md bg-cellar-ink text-white" aria-label="Close wine details" onClick={() => setActiveBottle(null)}>
+                <X className="size-4" aria-hidden />
+              </button>
+            </header>
+
+            <div className="p-5 sm:p-7">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                <p className="max-w-3xl leading-7 text-cellar-walnut">
+                  {activeBottle.research?.summary ?? activeBottle.note}
+                </p>
+                <button
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-burgundy-700 px-4 py-3 text-sm font-medium text-white disabled:opacity-55"
+                  disabled={isResearchingBottle}
+                  onClick={() => void openBottleDetails(activeBottle)}
+                >
+                  <RefreshCw className={`size-4 ${isResearchingBottle ? "animate-spin" : ""}`} aria-hidden />
+                  {isResearchingBottle ? "Researching" : "Refresh research"}
+                </button>
+              </div>
+
+              {bottleResearchError && (
+                <p className="mt-5 rounded-md bg-burgundy-50 px-4 py-3 text-sm font-medium text-burgundy-900" role="alert">
+                  {bottleResearchError}
+                </p>
+              )}
+
+              {isResearchingBottle && !activeBottle.research && (
+                <div className="mt-6 border-t border-cellar-oak/20 py-10 text-center">
+                  <RefreshCw className="mx-auto size-6 animate-spin text-burgundy-700" aria-hidden />
+                  <p className="mt-3 font-medium">Searching current wine sources...</p>
+                </div>
+              )}
+
+              {activeBottle.research ? (
+                <>
+                  <section className="mt-7 border-t border-cellar-oak/20 pt-6">
+                    <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Tasting profile</p>
+                    <ul className="mt-4 grid list-disc grid-cols-2 gap-x-8 gap-y-2 pl-5 text-sm font-medium sm:grid-cols-3 lg:grid-cols-4">
+                      {activeBottle.research.tastingNotes.map((note) => <li key={note}>{note}</li>)}
+                    </ul>
+                    <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        ["Nose", activeBottle.research.nose],
+                        ["Palate", activeBottle.research.palate],
+                        ["Finish", activeBottle.research.finish],
+                        ["Community", activeBottle.research.communityConsensus]
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <h3 className="font-serif text-xl">{label}</h3>
+                          <p className="mt-2 text-sm leading-6 text-cellar-walnut">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="mt-7 grid gap-7 border-t border-cellar-oak/20 pt-6 lg:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Ratings & reviews</p>
+                      <p className="mt-3 font-medium">Community rating: {activeBottle.research.communityRating}</p>
+                      <div className="mt-4 space-y-4">
+                        {activeBottle.research.criticScores.length ? activeBottle.research.criticScores.map((score) => (
+                          <div className="border-l-2 border-cellar-gold pl-4" key={`${score.source}-${score.score}`}>
+                            <p className="font-medium">{score.source}: {score.score}</p>
+                            <p className="mt-1 text-sm leading-6 text-cellar-walnut">{score.note}</p>
+                          </div>
+                        )) : <p className="text-sm text-cellar-walnut">No exact-vintage critic score was publicly available.</p>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Drink window</p>
+                      <h3 className="mt-3 font-serif text-2xl">{activeBottle.research.drinkWindow.status}</h3>
+                      <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                        <div><p className="text-cellar-walnut">Open from</p><p className="mt-1 font-medium">{activeBottle.research.drinkWindow.start}</p></div>
+                        <div><p className="text-cellar-walnut">Peak</p><p className="mt-1 font-medium">{activeBottle.research.drinkWindow.peak}</p></div>
+                        <div><p className="text-cellar-walnut">Drink by</p><p className="mt-1 font-medium">{activeBottle.research.drinkWindow.end}</p></div>
+                      </div>
+                      <p className="mt-4 text-sm leading-6 text-cellar-walnut">{activeBottle.research.drinkWindow.reason}</p>
+                    </div>
+                  </section>
+
+                  <section className="mt-7 grid gap-7 border-t border-cellar-oak/20 pt-6 lg:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Community pairings</p>
+                      <p className="mt-3 leading-7 text-cellar-walnut">
+                        {activeBottle.research.communityPairings.length ? activeBottle.research.communityPairings.join(" / ") : "No public community pairings were found."}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Sommelier pairings</p>
+                      <p className="mt-3 leading-7 text-cellar-walnut">
+                        {activeBottle.research.sommelierPairings.join(" / ") || "No additional pairings suggested."}
+                      </p>
+                    </div>
+                  </section>
+
+                  {activeBottle.research.researchedAt && (
+                    <p className="mt-7 border-t border-cellar-oak/20 pt-4 text-xs text-cellar-walnut">
+                      Updated {new Date(activeBottle.research.researchedAt).toLocaleString()}
+                    </p>
+                  )}
+                </>
+              ) : !isResearchingBottle && (
+                <section className="mt-7 grid gap-5 border-t border-cellar-oak/20 pt-6 sm:grid-cols-2">
+                  {[
+                    ["Appellation", activeBottle.appellation],
+                    ["Grapes", activeBottle.grapes],
+                    ["Service", activeBottle.service],
+                    ["Current window", activeBottle.drinkingWindow]
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">{label}</p>
+                      <p className="mt-2 font-medium">{value}</p>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       {activeDialog && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-cellar-night/70 p-4 backdrop-blur-sm" role="presentation" onClick={() => setActiveDialog(null)}>
