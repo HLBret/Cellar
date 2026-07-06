@@ -70,13 +70,52 @@ function getOpenAiErrorMessage(errorText: string) {
 
 function getResponseText(data: {
   output_text?: string;
-  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  output?: Array<{
+    text?: string;
+    content?: Array<{
+      type?: string;
+      text?: string | { value?: string };
+    }>;
+  }>;
 }) {
   if (data.output_text) return data.output_text;
-  return data.output
-    ?.flatMap((item) => item.content ?? [])
-    .find((part) => part.type === "output_text")
-    ?.text;
+  for (const item of data.output ?? []) {
+    if (typeof item.text === "string") return item.text;
+    for (const part of item.content ?? []) {
+      if (part.type !== "output_text") continue;
+      if (typeof part.text === "string") return part.text;
+      if (part.text?.value) return part.text.value;
+    }
+  }
+  return undefined;
+}
+
+function asString(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function normalizeRecognition(value: Partial<WineRecognition>): WineRecognition {
+  return {
+    producer: asString(value.producer, "Producer not confirmed"),
+    wine: asString(value.wine, "Wine name not confirmed"),
+    vintage: asString(value.vintage, "NV"),
+    country: asString(value.country, "Country not confirmed"),
+    region: asString(value.region, "Region not confirmed"),
+    appellation: asString(value.appellation, "Appellation not confirmed"),
+    grapes: asString(value.grapes, "Grapes not confirmed"),
+    classification: asString(value.classification, "Classification not confirmed"),
+    style: asString(value.style, "Wine style not confirmed"),
+    confidence: typeof value.confidence === "number" ? value.confidence : 0,
+    drinkingWindow: asString(value.drinkingWindow, "Drinking window not confirmed"),
+    service: asString(value.service, "Serving guidance not confirmed"),
+    note: asString(value.note, "Tasting details require further research."),
+    tastingNotes: Array.isArray(value.tastingNotes) ? value.tastingNotes.filter((note): note is string => typeof note === "string") : [],
+    producerHistory: asString(value.producerHistory, "Producer history requires further research."),
+    vintageSummary: asString(value.vintageSummary, "Vintage details require further research."),
+    foodPairing: asString(value.foodPairing, "Pairing guidance requires further research."),
+    sources: Array.isArray(value.sources) ? value.sources.filter((source): source is string => typeof source === "string") : [],
+    alternatives: Array.isArray(value.alternatives) ? value.alternatives.filter((alternative): alternative is string => typeof alternative === "string") : []
+  };
 }
 
 export async function POST(request: Request) {
@@ -162,11 +201,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = await response.json();
-  const responseText = getResponseText(data);
-  let output: WineRecognition | null = null;
+  let data: Parameters<typeof getResponseText>[0];
+  let output: WineRecognition;
   try {
-    output = responseText ? JSON.parse(responseText) as WineRecognition : null;
+    data = await response.json() as Parameters<typeof getResponseText>[0];
+    const responseText = getResponseText(data);
+    if (!responseText) throw new Error("missing_output_text");
+    output = normalizeRecognition(JSON.parse(responseText) as Partial<WineRecognition>);
   } catch {
     console.error("OpenAI recognition returned unreadable structured output.");
     return NextResponse.json(
@@ -174,13 +215,8 @@ export async function POST(request: Request) {
       { status: 502 }
     );
   }
-  if (!output) {
-    console.error("OpenAI recognition returned no output text.");
-    return NextResponse.json(
-      { error: "Bottle recognition is temporarily unavailable." },
-      { status: 502 }
-    );
-  }
+
+  console.log(`OpenAI recognition succeeded: ${output.vintage} ${output.producer} ${output.wine}`);
 
   return NextResponse.json({
     ...output,
