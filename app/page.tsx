@@ -366,6 +366,7 @@ export default function Home() {
 
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 70000);
+    let failureCode = "CLIENT_UNKNOWN";
     try {
       const image = await fileToDataUrl(file);
       const response = await fetch("/api/recognize-wine", {
@@ -375,7 +376,8 @@ export default function Home() {
         signal: controller.signal
       });
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: "AI recognition unavailable." })) as { error?: string };
+        const error = await response.json().catch(() => ({ error: "AI recognition unavailable.", code: `HTTP_${response.status}` })) as { error?: string; code?: string };
+        failureCode = error.code ?? `HTTP_${response.status}`;
         throw new Error(error.error ?? "AI recognition unavailable.");
       }
       const recognition = await response.json() as AiRecognition;
@@ -385,10 +387,11 @@ export default function Home() {
     } catch (error) {
       console.error("Cellar bottle recognition failed:", error);
       setResearchIndex(-1);
+      if (error instanceof DOMException && error.name === "AbortError") failureCode = "CLIENT_TIMEOUT";
       setRecognitionStatus(
         error instanceof DOMException && error.name === "AbortError"
-          ? "Recognition took too long. Try a closer label photo."
-          : "We could not identify this bottle. Try another photo."
+          ? `Recognition took too long. Try a closer label photo. Reference: ${failureCode}`
+          : `We could not identify this bottle. Try another photo. Reference: ${failureCode}`
       );
     } finally {
       window.clearTimeout(timeout);

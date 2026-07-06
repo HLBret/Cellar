@@ -122,18 +122,18 @@ export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "OpenAI recognition is not configured. Add OPENAI_API_KEY to .env.local, then restart Cellar." },
+      { error: "Bottle recognition is not configured.", code: "CONFIG_MISSING" },
       { status: 501 }
     );
   }
 
   const { image } = await request.json() as { image?: string };
   if (!image) {
-    return NextResponse.json({ error: "A bottle image is required." }, { status: 400 });
+    return NextResponse.json({ error: "A bottle image is required.", code: "IMAGE_MISSING" }, { status: 400 });
   }
   if (!/^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(image)) {
     return NextResponse.json(
-      { error: "Cellar needs a JPEG, PNG, or WebP bottle image." },
+      { error: "Cellar needs a JPEG, PNG, or WebP bottle image.", code: "IMAGE_FORMAT" },
       { status: 400 }
     );
   }
@@ -187,7 +187,7 @@ export async function POST(request: Request) {
   } catch {
     console.error("OpenAI recognition request could not reach the API.");
     return NextResponse.json(
-      { error: "Bottle recognition is temporarily unavailable." },
+      { error: "Bottle recognition is temporarily unavailable.", code: "OPENAI_CONNECTION" },
       { status: 502 }
     );
   }
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
     const message = getOpenAiErrorMessage(await response.text());
     console.error(`OpenAI recognition failed (${response.status}): ${message}`);
     return NextResponse.json(
-      { error: "Bottle recognition is temporarily unavailable." },
+      { error: "Bottle recognition is temporarily unavailable.", code: `OPENAI_${response.status}` },
       { status: response.status }
     );
   }
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
   } catch {
     console.error("OpenAI recognition returned unreadable structured output.");
     return NextResponse.json(
-      { error: "Bottle recognition is temporarily unavailable." },
+      { error: "Bottle recognition is temporarily unavailable.", code: "OPENAI_OUTPUT" },
       { status: 502 }
     );
   }
