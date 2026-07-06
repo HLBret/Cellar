@@ -844,7 +844,7 @@ export default function Home() {
       <section className="bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {scannerTarget && createPortal(
-          <Panel title="ChatGPT Bottle Recognition" eyebrow="Add Bottle" icon={<ScanLine className="size-5" />} id="add-bottle">
+          <Panel title="Bottle Recognition" eyebrow="Add Bottle" icon={<ScanLine className="size-5" />} id="add-bottle">
             <div className="-mt-16 mb-5 flex justify-end">
               <button
                 className="grid size-9 place-items-center rounded-md bg-cellar-cream text-burgundy-700 disabled:cursor-not-allowed disabled:opacity-40"
