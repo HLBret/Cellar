@@ -885,7 +885,7 @@
             <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
           </div>
           <span class="pill">Entering <span id="hero-cellar-name">My Cellar</span></span>
-          <h1 class="serif">Welcome back, <span id="welcome-name">First_Name</span>.</h1>
+          <h1 class="serif" id="welcome-heading">Welcome.</h1>
           <p>Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which vintage deserves the table tonight.</p>
           <div class="bottle"><div class="label"><small>Grand Cru</small><b>Cellar</b><p>AI Selected</p><b>2018</b></div></div>
           <div class="stats">
@@ -1602,7 +1602,7 @@
       const profileFirstName = document.getElementById("profile-first-name");
       const profileCellarName = document.getElementById("profile-cellar-name");
       const profileStatus = document.getElementById("profile-status");
-      const welcomeName = document.getElementById("welcome-name");
+      const welcomeHeading = document.getElementById("welcome-heading");
       const heroCellarName = document.getElementById("hero-cellar-name");
       const overviewCellarName = document.getElementById("overview-cellar-name");
       let activeCellarName = localStorage.getItem("cellar-profile-cellar-name") || "My Cellar";
@@ -1612,27 +1612,24 @@
         heroCellarName.textContent = name;
         overviewCellarName.textContent = name;
       }
-      const savedFirstName = localStorage.getItem("cellar-profile-first-name") || "";
-      if (savedFirstName) {
-        profileFirstName.value = savedFirstName;
-        welcomeName.textContent = savedFirstName;
+      function applyFirstName(name) {
+        profileFirstName.value = name;
+        welcomeHeading.textContent = name ? `Welcome back, ${name}.` : "Welcome.";
       }
+      const savedFirstName = localStorage.getItem("cellar-profile-first-name") || "";
+      applyFirstName(savedFirstName);
       applyCellarName(activeCellarName);
       profileForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const firstName = profileFirstName.value.trim();
         const cellarName = profileCellarName.value.trim();
-        if (!firstName) {
-          profileStatus.textContent = "Enter your first name.";
-          return;
-        }
         if (!cellarName) {
           profileStatus.textContent = "Name your cellar.";
           return;
         }
         localStorage.setItem("cellar-profile-first-name", firstName);
         localStorage.setItem("cellar-profile-cellar-name", cellarName);
-        welcomeName.textContent = firstName;
+        applyFirstName(firstName);
         applyCellarName(cellarName);
         profileStatus.textContent = "Profile saved.";
       });

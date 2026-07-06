@@ -241,7 +241,7 @@ export default function Home() {
   const [sommelierMessages, setSommelierMessages] = useState<Array<{ role: "assistant" | "user"; text: string }>>([
     { role: "assistant", text: "Good evening. What are you cooking, or what would you like to open?" }
   ]);
-  const [firstName, setFirstName] = useState("First_Name");
+  const [firstName, setFirstName] = useState("");
   const [profileFirstName, setProfileFirstName] = useState("");
   const [cellarName, setCellarName] = useState("My Cellar");
   const [profileCellarName, setProfileCellarName] = useState("My Cellar");
@@ -352,10 +352,6 @@ export default function Home() {
   function saveProfile() {
     const nameValue = profileFirstName.trim();
     const cellarValue = profileCellarName.trim();
-    if (!nameValue) {
-      setProfileStatus("Enter your first name.");
-      return;
-    }
     if (!cellarValue) {
       setProfileStatus("Name your cellar.");
       return;
@@ -575,7 +571,7 @@ export default function Home() {
                     Entering {cellarName}
                   </div>
                   <h1 className="max-w-2xl font-serif text-5xl leading-[0.95] tracking-normal text-white sm:text-7xl">
-                    Welcome back, {firstName}.
+                    {firstName ? `Welcome back, ${firstName}.` : "Welcome."}
                   </h1>
                   <p className="mt-5 max-w-xl text-base leading-7 text-cellar-cream/76 sm:text-lg">
                     Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which
