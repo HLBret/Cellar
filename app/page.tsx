@@ -574,7 +574,7 @@ export default function Home() {
   return (
     <main className="min-h-screen overflow-hidden bg-cellar-cream text-cellar-ink">
       <section className="relative isolate min-h-screen px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(199,162,90,0.20),transparent_30%),linear-gradient(135deg,#fbf7ed_0%,#f2e5d0_48%,#d9bfa0_100%)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(199,162,90,0.12),transparent_30%),linear-gradient(180deg,#fbf7ed_0%,#f6efe1_100%)]" />
         <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-[linear-gradient(180deg,rgba(59,12,27,0.12),transparent)]" />
 
         <header className="relative z-50 mx-auto flex max-w-7xl items-center justify-between rounded-lg border border-white/60 bg-white/42 px-3 py-3 shadow-soft backdrop-blur-md">
