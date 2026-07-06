@@ -672,12 +672,21 @@ export default function Home() {
             <div className="relative grid gap-8 lg:grid-cols-[1fr_260px]">
               <div className="flex min-h-[560px] flex-col justify-between">
                 <div>
-                  <div className="mb-5 inline-flex items-center gap-2 rounded-md border border-cellar-gold/40 bg-white/8 px-3 py-2 text-sm text-cellar-cream/85">
-                    <Sparkles className="size-4 text-cellar-gold" aria-hidden />
-                    Entering {cellarName}
+                  <div className="mb-5 flex items-center gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full border border-cellar-gold/35 bg-cellar-gold/10 text-cellar-gold">
+                      <Wine className="size-4" aria-hidden />
+                    </span>
+                    <span className="text-xs font-medium uppercase tracking-[0.14em] text-cellar-cream/72">
+                      Entering {cellarName}
+                    </span>
                   </div>
-                  <h1 className="max-w-2xl font-serif text-5xl leading-[0.95] tracking-normal text-white sm:text-7xl">
-                    {firstName ? `Welcome back, ${firstName}.` : "Welcome."}
+                  <h1 className="max-w-2xl font-serif text-4xl leading-[1.02] tracking-normal text-white sm:text-6xl lg:text-7xl">
+                    {firstName ? (
+                      <>
+                        Welcome back,
+                        <span className="mt-1 block sm:ml-3 sm:mt-0 sm:inline">{firstName}.</span>
+                      </>
+                    ) : "Welcome."}
                   </h1>
                   <p className="mt-5 max-w-xl text-base leading-7 text-cellar-cream/76 sm:text-lg">
                     Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which
