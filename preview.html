@@ -56,15 +56,6 @@
         backdrop-filter: blur(18px);
       }
       .brand { display: flex; align-items: center; gap: 12px; }
-      .mark {
-        display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 6px;
-        background: var(--wine);
-        color: var(--cream);
-      }
       .brand strong { display: block; font-size: 21px; line-height: 1; font-weight: 500; }
       .brand span { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--oak); }
       .add {
@@ -430,45 +421,76 @@
         overflow: hidden;
         border: 1px solid rgba(142,96,72,.16);
         border-radius: 8px;
-        background: rgba(255,255,255,.84);
+        background: white;
         box-shadow: 0 12px 36px rgba(63,41,35,.12);
+        transition: transform .18s ease, box-shadow .18s ease;
       }
+      .wine-card:hover { transform: translateY(-2px); box-shadow: 0 24px 70px rgba(32,23,21,.18); }
       .wine-card-cover {
         position: relative;
-        height: 136px;
-        padding: 16px;
+        height: 160px;
+        padding: 18px;
         color: white;
         background: linear-gradient(135deg, var(--burgundy), var(--night));
       }
-      .wine-card-cover span { color: rgba(255,255,255,.7); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
-      .wine-card-cover strong { display: block; margin-top: 10px; font: 500 38px Georgia, serif; }
+      .wine-card-cover:after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0;
+        height: 88px;
+        background: linear-gradient(180deg, transparent, rgba(0,0,0,.45));
+      }
+      .wine-card-cover span { position: relative; z-index: 1; display: block; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,.72); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+      .wine-card-cover strong { position: relative; z-index: 1; display: block; margin-top: 10px; font: 500 48px/1 Georgia, serif; }
       .wine-card-score {
         position: absolute;
         right: 16px;
-        bottom: 16px;
-        border-radius: 6px;
+        top: 16px;
+        z-index: 2;
+        border-radius: 999px;
         background: rgba(255,255,255,.9);
         color: var(--ink);
-        padding: 6px 8px;
+        padding: 6px 10px;
         font-weight: 800;
       }
+      .wine-card-status {
+        position: absolute;
+        z-index: 2;
+        left: 18px;
+        right: 18px;
+        bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .wine-card-status b,
+      .wine-card-status em {
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-style: normal;
+        font-weight: 800;
+      }
+      .wine-card-status b { border: 1px solid rgba(255,255,255,.22); background: rgba(0,0,0,.18); color: white; }
+      .wine-card-status em { background: var(--gold); color: var(--ink); }
       .wine-card-body { padding: 18px; }
       .wine-card-producer { color: var(--burgundy); font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
-      .wine-card h3 { margin: 7px 0 0; font: 500 25px/1.15 Georgia, serif; }
+      .wine-card h3 { min-height: 58px; margin: 7px 0 0; font: 500 25px/1.15 Georgia, serif; }
       .wine-card-meta, .wine-card-note { color: var(--oak); font-size: 14px; line-height: 1.55; }
-      .wine-card-note { min-height: 66px; }
+      .wine-card-note { margin-top: 14px; }
+      .wine-note-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+      .wine-note-pills span { border-radius: 999px; background: #fbf2f4; color: var(--wine); padding: 6px 10px; font-size: 12px; font-weight: 800; }
       .wine-details {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin-top: 14px;
-        padding: 14px 0;
-        border-top: 1px solid rgba(142,96,72,.15);
-        border-bottom: 1px solid rgba(142,96,72,.15);
+        gap: 10px;
+        margin-top: 18px;
       }
+      .wine-details div { border-radius: 6px; background: var(--paper); padding: 11px; }
       .wine-details small { display: block; color: var(--oak); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
       .wine-details b { display: block; margin-top: 3px; font-size: 13px; }
-      .wine-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+      .wine-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(142,96,72,.15); }
       .wine-card-foot p { margin: 0; color: var(--oak); font-size: 12px; }
       .wine-card-actions { display: flex; gap: 7px; flex: 0 0 auto; }
       .wine-card-actions button {
@@ -673,6 +695,14 @@
       }
       .refresh-scan:disabled { cursor: not-allowed; opacity: .4; }
       #recognition-details { display: grid; gap: 8px; }
+      .note-list {
+        margin: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 22px;
+        padding-left: 18px;
+        font-weight: 700;
+      }
       .scan-purpose {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -706,11 +736,23 @@
         border-radius: 8px;
         overflow: hidden;
         border: 1px solid rgba(199,162,90,.22);
-        background: radial-gradient(circle at 22% 25%, rgba(199,162,90,.3), transparent 16%), radial-gradient(circle at 45% 42%, rgba(143,29,58,.55), transparent 14%), radial-gradient(circle at 74% 66%, rgba(91,112,85,.45), transparent 16%), linear-gradient(135deg,#303b36,#111);
+        background:
+          linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+          #172222;
+        background-size: 52px 52px;
+      }
+      .world-shape {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: .72;
       }
       .map-node {
         position: absolute;
         min-width: 106px;
+        transform: translate(-50%, -50%);
         border: 1px solid rgba(255,255,255,.22);
         border-radius: 6px;
         background: var(--gold);
@@ -722,6 +764,15 @@
         box-shadow: 0 14px 30px rgba(0,0,0,.18);
       }
       .map-node.active { background: white; color: var(--burgundy); outline: 2px solid var(--gold); }
+      .map-empty {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        text-align: center;
+        color: rgba(246,239,225,.72);
+      }
       .map-node span { display: block; margin-top: 3px; font-size: 11px; opacity: .72; }
       .map-detail {
         margin-top: 12px;
@@ -881,7 +932,6 @@
     <main class="shell">
       <header class="topbar">
         <div class="brand">
-          <div class="mark">C</div>
           <div><strong class="serif">Cellar</strong><span>Private collection</span></div>
         </div>
         <div class="actions">
@@ -914,7 +964,7 @@
             <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
             <div class="shelf"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
           </div>
-          <div class="hero-intro"><span class="hero-intro-icon" aria-hidden="true">C</span><span>Entering <span id="hero-cellar-name">My Cellar</span></span></div>
+          <div class="hero-intro"><span>Entering <span id="hero-cellar-name">My Cellar</span></span></div>
           <h1 class="serif" id="welcome-heading">Welcome.</h1>
           <p>Browse the bottles resting in each rack, see what is ready to open, and ask the sommelier which vintage deserves the table tonight.</p>
           <div class="bottle"><div class="label"><small>Grand Cru</small><b>Cellar</b><p>AI Selected</p><b>2018</b></div></div>
@@ -1033,11 +1083,14 @@
           <p class="eyebrow">Collection geography</p>
           <h2>Regional Map</h2>
           <div class="map" id="map-plot">
-            <button class="map-node active" data-region="Burgundy" style="left:12%;top:22%">Burgundy<span>0 bottles</span></button>
-            <button class="map-node" data-region="Bordeaux" style="left:30%;top:42%">Bordeaux<span>0 bottles</span></button>
-            <button class="map-node" data-region="Champagne" style="left:48%;top:62%">Champagne<span>0 bottles</span></button>
-            <button class="map-node" data-region="Piedmont" style="left:58%;top:28%">Piedmont<span>0 bottles</span></button>
-            <button class="map-node" data-region="Santa Cruz" style="left:70%;top:52%">Santa Cruz<span>0 bottles</span></button>
+            <svg class="world-shape" viewBox="0 0 1000 520" aria-hidden="true">
+              <path fill="#52674f" d="M92 160 150 114l86 8 55 47-16 63 34 47-60 44-88-24-72-61z"></path>
+              <path fill="#52674f" d="m246 322 64 16 36 54-31 72-50-20-31-70z"></path>
+              <path fill="#5d7358" d="m438 137 82-26 95 26 64-5 54 44-28 45-100-2-48 36-90-20-56-41z"></path>
+              <path fill="#5d7358" d="m526 245 84 15 46 73-20 102-56 4-36-68-58-39z"></path>
+              <path fill="#536a56" d="m684 151 96-31 96 40 40 78-73 40-104-28-71 18-42-52z"></path>
+              <path fill="#536a56" d="m786 344 88 16 49 53-35 43-104-16-31-55z"></path>
+            </svg>
           </div>
           <div class="map-detail">
             <p class="eyebrow">Selected region</p>
@@ -1110,6 +1163,8 @@
       </section>
     </div>
     <script>
+      if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+      if (!window.location.hash) requestAnimationFrame(() => window.scrollTo(0, 0));
       document.querySelector(".hero-column").appendChild(document.getElementById("add-bottle"));
       const dropzone = document.getElementById("bottle-dropzone");
       const uploadInput = document.getElementById("bottle-upload");
@@ -1138,6 +1193,7 @@
           producerHistory: "Domaine Leflaive is one of Puligny-Montrachet's benchmark domaines, known for precise, long-lived white Burgundy.",
           vintageSummary: "2020 Burgundy whites are concentrated and ripe, but the strongest producers kept tension and mineral drive.",
           foodPairing: "Roast chicken, scallops, sole meuniere, Comte, or a simple mushroom tart.",
+          tastingNotes: ["white flowers", "Meyer lemon", "citrus oil", "hazelnut", "crushed chalk", "mineral"],
           note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. Layered, satin-textured, and mineral."
         },
         {
@@ -1152,6 +1208,7 @@
           producerHistory: "Ridge is a historic California estate with a restrained, ageworthy style centered on mountain fruit and transparent winemaking.",
           vintageSummary: "2019 Santa Cruz Cabernet generally shows polish, freshness, and long-term structure.",
           foodPairing: "Dry-aged steak, lamb shoulder, short ribs, grilled mushrooms, or aged cheddar.",
+          tastingNotes: ["cassis", "mint", "crushed stone", "cedar", "savory herbs", "firm tannins"],
           note: "Mountain cassis, mint, crushed stone, cedar, and savory herbs framed by fresh acidity and firm tannins."
         },
         {
@@ -1166,6 +1223,7 @@
           producerHistory: "Giacomo Conterno is among Barolo's most revered traditional producers, famous for powerful, slow-evolving Nebbiolo.",
           vintageSummary: "2013 Barolo is a classic, structured vintage with aromatic lift and excellent aging potential.",
           foodPairing: "Braised beef, truffle risotto, porcini, lamb, aged Parmigiano-Reggiano, or tajarin.",
+          tastingNotes: ["rose", "tar", "red fruit", "iron", "alpine herbs", "porcini"],
           note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity."
         }
       ];
@@ -1184,24 +1242,32 @@
           recognitionDetails.innerHTML = '<div class="row"><span>Identification</span><strong>AI recognition unavailable in file preview</strong></div>';
           return;
         }
+        const tastingNotes = (wine.tastingNotes || []).length
+          ? `<div class="row"><span>Tasting notes</span><ul class="note-list">${wine.tastingNotes.map((note) => `<li>${note}</li>`).join("")}</ul></div>`
+          : "";
         const details = [
           ["Producer", wine.producer], ["Wine", wine.wine], ["Vintage", wine.vintage], ["Region", wine.region],
           ["Appellation", wine.appellation], ["Grapes", wine.grapes], ["Classification", wine.classification],
-          ["Confidence", `${wine.confidence || 86}%`], ["Sources", (wine.sources || ["Curated Cellar fallback"]).join(" / ")],
-          ["Drinking window", wine.window], ["Serving", wine.service], ["Tasting notes", wine.note],
+          ["Drinking window", wine.window], ["Serving", wine.service],
           ["Producer notes", wine.producerHistory || "Detailed producer notes require AI recognition."],
           ["Vintage notes", wine.vintageSummary || "Detailed vintage notes require AI recognition."],
           ["Pairing", wine.foodPairing || "Pairing research requires AI recognition."],
           ["Other likely matches", (wine.alternatives || ["None shown"]).join(" / ")]
         ];
-        recognitionDetails.innerHTML = details.map(([label, value]) => `<div class="row"><span>${label}</span><strong>${value}</strong></div>`).join("");
+        recognitionDetails.innerHTML = tastingNotes + details.map(([label, value]) => `<div class="row"><span>${label}</span><strong>${value}</strong></div>`).join("");
       }
 
       function refreshWineIdentification() {
-        if (!bottlePhotoReady) return;
+        bottlePhotoReady = false;
         currentResearchIndex = -1;
+        fileName.textContent = "No bottle photo selected";
+        previewImage.removeAttribute("src");
+        previewImage.style.display = "none";
+        emptyPhoto.style.display = "block";
+        identifyAction.disabled = true;
+        refreshIdentification.disabled = true;
         renderRecognition();
-        recognitionStatus.textContent = "Upload-only recognition requires the OpenAI-backed app server, not the local file preview.";
+        recognitionStatus.textContent = "Upload or take a photo to identify the bottle";
       }
 
       function updateBottleIntent() {
@@ -1314,19 +1380,19 @@
 
       function profileForWeather(label, temperature, code) {
         const condition = weatherDescriptions[code] || "settled";
-        const rounded = Math.round(temperature);
+        const rounded = Math.round((temperature * 9) / 5 + 32);
         if (temperature >= 23) {
           return {
-            weather: `${rounded} C / ${condition}`
+            weather: `${rounded} F / ${condition}`
           };
         }
         if (temperature <= 10 || code >= 51) {
           return {
-            weather: `${rounded} C / ${condition}`
+            weather: `${rounded} F / ${condition}`
           };
         }
         return {
-          weather: `${rounded} C / ${condition}`
+          weather: `${rounded} F / ${condition}`
         };
       }
 
@@ -1413,6 +1479,19 @@
         }
       }
 
+      function regionLabel(region) {
+        const lower = String(region || "").toLowerCase();
+        const known = Object.keys(regionCoordinates).find((name) => lower.includes(name.toLowerCase()));
+        return known || String(region || "Unknown region").split(",")[0].trim() || "Unknown region";
+      }
+
+      function updateCollectionRegionOptions() {
+        const current = collectionRegion.value;
+        const regions = [...new Set(collectionBottles.map((wine) => regionLabel(wine.region)))];
+        collectionRegion.innerHTML = `<option>All regions</option>${regions.map((region) => `<option>${region}</option>`).join("")}`;
+        collectionRegion.value = current === "All regions" || regions.includes(current) ? current : "All regions";
+      }
+
       function saveResearchedBottle() {
         const researchedBottle = currentResearchedWine();
         if (!researchedBottle) return;
@@ -1442,6 +1521,7 @@
         document.getElementById("overview-white").textContent = collectionTotal;
         document.getElementById("overview-cellar-bottles").textContent = collectionTotal;
         showProfile(activeTonightProfile);
+        updateCollectionRegionOptions();
         selectMapRegion(selectedMapRegion);
       }
 
@@ -1450,7 +1530,7 @@
         const region = collectionRegion.value;
         const sort = collectionSort.value;
         const visible = collectionBottles
-          .filter((wine) => region === "All regions" || wine.region.includes(region))
+          .filter((wine) => region === "All regions" || regionLabel(wine.region) === region)
           .filter((wine) => `${wine.producer} ${wine.wine} ${wine.vintage} ${wine.region} ${wine.grapes}`.toLowerCase().includes(query))
           .sort((a, b) => sort === "score" ? b.score - a.score : sort === "vintage" ? String(b.vintage).localeCompare(String(a.vintage)) : a.producer.localeCompare(b.producer));
 
@@ -1462,25 +1542,26 @@
         collectionGrid.innerHTML = visible.map((wine) => `
           <article class="wine-card">
             <div class="wine-card-cover" style="background:${wine.color}">
-              <span>${wine.region}</span>
+              <span>${regionLabel(wine.region)}</span>
               <strong>${wine.vintage}</strong>
-              <b class="wine-card-score">${wine.score} pts</b>
+              <b class="wine-card-score">${wine.quantity}</b>
+              <div class="wine-card-status"><b>${wine.classification}</b><em>${wine.maturity}</em></div>
             </div>
             <div class="wine-card-body">
               <div class="wine-card-producer">${wine.producer}</div>
               <h3>${wine.wine}</h3>
-              <p class="wine-card-meta">${wine.appellation} / ${wine.classification}</p>
-              <p class="wine-card-note">${wine.note}</p>
+              <p class="wine-card-meta">${wine.appellation}</p>
+              ${(wine.tastingNotes || []).length
+                ? `<div class="wine-note-pills">${wine.tastingNotes.slice(0, 6).map((note) => `<span>${note}</span>`).join("")}</div>`
+                : `<p class="wine-card-note">${wine.note}</p>`}
               <div class="wine-details">
                 <div><small>Grapes</small><b>${wine.grapes}</b></div>
-                <div><small>Maturity</small><b>${wine.maturity}</b></div>
                 <div><small>Drink</small><b>${wine.window}</b></div>
-                <div><small>Quantity</small><b>${wine.quantity}</b></div>
                 <div><small>Storage</small><b>${wine.storage}</b></div>
                 <div><small>Service</small><b>${wine.service}</b></div>
               </div>
               <div class="wine-card-foot">
-                <p>Purchased ${wine.purchase}<br>Current ${wine.market}</p>
+                <p>Added to ${wine.storage}<br>${wine.market}</p>
                 <div class="wine-card-actions">
                   <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
                   <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
@@ -1564,71 +1645,117 @@
         button.addEventListener("click", () => sendSommelierMessage(button.dataset.sommelierPrompt));
       });
 
-      const regionalCollection = {
-        Burgundy: {}, Bordeaux: {}, Champagne: {}, Piedmont: {}, "Santa Cruz": {}
+      const regionCoordinates = {
+        Burgundy: { left: 48, top: 35 },
+        Bordeaux: { left: 46, top: 39 },
+        Champagne: { left: 49, top: 32 },
+        Rioja: { left: 44, top: 42 },
+        Piedmont: { left: 51, top: 40 },
+        Tuscany: { left: 52, top: 45 },
+        Napa: { left: 16, top: 41 },
+        "Santa Cruz": { left: 16, top: 43 },
+        "Finger Lakes": { left: 27, top: 38 },
+        Mosel: { left: 50, top: 34 },
+        "Rhône": { left: 48, top: 41 },
+        Mendoza: { left: 31, top: 72 },
+        Chile: { left: 28, top: 72 },
+        Barossa: { left: 82, top: 73 },
+        Marlborough: { left: 88, top: 78 },
+        Douro: { left: 43, top: 43 },
+        Stellenbosch: { left: 53, top: 76 }
       };
-      const mapNodes = document.querySelectorAll(".map-node");
       const mapRegionName = document.getElementById("map-region-name");
       const mapBottles = document.getElementById("map-bottles");
       const mapReady = document.getElementById("map-ready");
       const mapScore = document.getElementById("map-score");
       const mapValue = document.getElementById("map-value");
       const mapProducer = document.getElementById("map-producer");
+      const mapPlot = document.getElementById("map-plot");
       const viewRegionBottles = document.getElementById("view-region-bottles");
       const readyRegionBottles = document.getElementById("ready-region-bottles");
       const regionSummary = document.getElementById("region-summary");
-      let selectedMapRegion = "Burgundy";
+      let selectedMapRegion = "";
+
+      function mapPosition(region, index) {
+        return regionCoordinates[region] || { left: 18 + ((index * 17) % 66), top: 28 + ((index * 13) % 44) };
+      }
+
+      function mapRegions() {
+        const grouped = new Map();
+        collectionBottles.forEach((wine) => {
+          const label = regionLabel(wine.region);
+          grouped.set(label, [...(grouped.get(label) || []), wine]);
+        });
+        return [...grouped.entries()].map(([region, wines], index) => ({ region, wines, position: mapPosition(region, index) }));
+      }
+
+      function renderMapNodes(activeRegion) {
+        mapPlot.querySelectorAll(".map-node,.map-empty").forEach((node) => node.remove());
+        const regions = mapRegions();
+        if (!regions.length) {
+          mapPlot.insertAdjacentHTML("beforeend", '<div class="map-empty">Add a bottle and Cellar will place its origin on the world map.</div>');
+          return;
+        }
+        regions.forEach(({ region, wines, position }) => {
+          const bottleCount = wines.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+          const button = document.createElement("button");
+          button.className = `map-node${activeRegion === region ? " active" : ""}`;
+          button.dataset.region = region;
+          button.style.left = `${position.left}%`;
+          button.style.top = `${position.top}%`;
+          button.innerHTML = `${region}<span>${bottleCount} bottle${bottleCount === 1 ? "" : "s"}</span>`;
+          button.addEventListener("click", () => selectMapRegion(region));
+          mapPlot.appendChild(button);
+        });
+      }
 
       function selectMapRegion(region) {
-        selectedMapRegion = region;
-        const regionWines = collectionBottles.filter((wine) => wine.region.includes(region));
+        const regions = mapRegions();
+        selectedMapRegion = regions.some((item) => item.region === region) ? region : regions[0]?.region || "";
+        const regionWines = selectedMapRegion ? collectionBottles.filter((wine) => regionLabel(wine.region) === selectedMapRegion) : [];
         const bottleCount = regionWines.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
         const readyCount = regionWines.filter((wine) => /peak/i.test(wine.maturity)).length;
         const averageScore = regionWines.length
           ? (regionWines.reduce((total, wine) => total + Number(wine.score), 0) / regionWines.length).toFixed(1)
           : "-";
-        mapNodes.forEach((node) => {
-          const nodeWines = collectionBottles.filter((wine) => wine.region.includes(node.dataset.region));
-          const nodeCount = nodeWines.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
-          node.classList.toggle("active", node.dataset.region === region);
-          node.querySelector("span").textContent = `${nodeCount} bottle${nodeCount === 1 ? "" : "s"}`;
-        });
-        mapRegionName.textContent = region;
+        renderMapNodes(selectedMapRegion);
+        mapRegionName.textContent = selectedMapRegion || "No regions yet";
         mapBottles.textContent = bottleCount;
         mapReady.textContent = readyCount;
         mapScore.textContent = averageScore;
         mapValue.textContent = regionWines.length ? "Researching" : "-";
         const topWine = regionWines.slice().sort((a, b) => Number(b.score) - Number(a.score))[0];
         mapProducer.textContent = topWine ? `${topWine.vintage} ${topWine.producer}` : "None yet";
-        viewRegionBottles.textContent = `View ${region} bottles`;
-        readyRegionBottles.textContent = `Ready in ${region}`;
+        viewRegionBottles.textContent = selectedMapRegion ? `View ${selectedMapRegion} bottles` : "View bottles";
+        readyRegionBottles.textContent = selectedMapRegion ? `Ready in ${selectedMapRegion}` : "Ready bottles";
       }
 
-      mapNodes.forEach((node) => node.addEventListener("click", () => selectMapRegion(node.dataset.region)));
       viewRegionBottles.addEventListener("click", () => {
+        if (!selectedMapRegion) return;
         collectionRegion.value = selectedMapRegion;
         renderCollection();
         document.getElementById("my-collection").scrollIntoView({ behavior: "smooth" });
       });
       readyRegionBottles.addEventListener("click", () => {
+        if (!selectedMapRegion) return;
         collectionRegion.value = selectedMapRegion;
         renderCollection();
         openActionModal(
           `Ready in ${selectedMapRegion}`,
-          collectionBottles.filter((wine) => wine.region.includes(selectedMapRegion) && /peak/i.test(wine.maturity)).length
-            ? collectionBottles.filter((wine) => wine.region.includes(selectedMapRegion) && /peak/i.test(wine.maturity)).map((wine) => `${wine.vintage} ${wine.producer} ${wine.wine}`).join(". ")
+          collectionBottles.filter((wine) => regionLabel(wine.region) === selectedMapRegion && /peak/i.test(wine.maturity)).length
+            ? collectionBottles.filter((wine) => regionLabel(wine.region) === selectedMapRegion && /peak/i.test(wine.maturity)).map((wine) => `${wine.vintage} ${wine.producer} ${wine.wine}`).join(". ")
             : `No bottles from ${selectedMapRegion} are marked ready right now.`
         );
       });
       regionSummary.addEventListener("click", () => {
-        const regionWines = collectionBottles.filter((wine) => wine.region.includes(selectedMapRegion));
+        const regionWines = collectionBottles.filter((wine) => regionLabel(wine.region) === selectedMapRegion);
         const bottleCount = regionWines.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
         const topWine = regionWines.slice().sort((a, b) => Number(b.score) - Number(a.score))[0];
         openActionModal(
-          `${selectedMapRegion} summary`,
+          `${selectedMapRegion || "Region"} summary`,
           regionWines.length
             ? `${activeCellarName} has ${bottleCount} bottle${bottleCount === 1 ? "" : "s"} from ${selectedMapRegion}. The highest scoring card is ${topWine.vintage} ${topWine.producer} ${topWine.wine}.`
-            : `${activeCellarName} does not have bottles from ${selectedMapRegion} yet.`
+            : `${activeCellarName} does not have bottles from this region yet.`
         );
       });
 

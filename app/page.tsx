@@ -11,7 +11,7 @@ import {
   ImageIcon,
   LayoutDashboard,
   LocateFixed,
-  Map,
+  Map as MapIcon,
   MapPin,
   Menu,
   MessageCircle,
@@ -28,7 +28,7 @@ import {
   X
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 type WineResearch = {
@@ -126,12 +126,24 @@ const windows = [
   ["Drink Soon", 22, "bg-burgundy-500"]
 ];
 
-const regionalCollection = {
-  Burgundy: {},
-  Bordeaux: {},
-  Champagne: {},
-  Piedmont: {},
-  "Santa Cruz": {}
+const regionCoordinates: Record<string, { left: number; top: number }> = {
+  Burgundy: { left: 48, top: 35 },
+  Bordeaux: { left: 46, top: 39 },
+  Champagne: { left: 49, top: 32 },
+  Rioja: { left: 44, top: 42 },
+  Piedmont: { left: 51, top: 40 },
+  Tuscany: { left: 52, top: 45 },
+  Napa: { left: 16, top: 41 },
+  "Santa Cruz": { left: 16, top: 43 },
+  "Finger Lakes": { left: 27, top: 38 },
+  Mosel: { left: 50, top: 34 },
+  "Rhône": { left: 48, top: 41 },
+  Mendoza: { left: 31, top: 72 },
+  Chile: { left: 28, top: 72 },
+  Barossa: { left: 82, top: 73 },
+  Marlborough: { left: 88, top: 78 },
+  Douro: { left: 43, top: 43 },
+  Stellenbosch: { left: 53, top: 76 }
 };
 
 type AiRecognition = {
@@ -249,21 +261,38 @@ function toCollectionBottle(recognition: AiRecognition): CollectionBottle {
 
 function profileForWeather(label: string, temperature: number, weatherCode: number): TonightProfile {
   const condition = weatherDescriptions[weatherCode] ?? "settled";
+  const fahrenheit = Math.round((temperature * 9) / 5 + 32);
   if (temperature >= 23) {
     return {
       label,
-      weather: `${Math.round(temperature)} C / ${condition}`
+      weather: `${fahrenheit} F / ${condition}`
     };
   }
   if (temperature <= 10 || weatherCode >= 51) {
     return {
       label,
-      weather: `${Math.round(temperature)} C / ${condition}`
+      weather: `${fahrenheit} F / ${condition}`
     };
   }
   return {
     label,
-    weather: `${Math.round(temperature)} C / ${condition}`
+    weather: `${fahrenheit} F / ${condition}`
+  };
+}
+
+function regionLabel(region: string) {
+  const lower = region.toLowerCase();
+  const knownRegion = Object.keys(regionCoordinates).find((name) => lower.includes(name.toLowerCase()));
+  if (knownRegion) return knownRegion;
+  return region.split(",")[0]?.trim() || "Unknown region";
+}
+
+function mapPositionForRegion(region: string, index: number) {
+  const known = regionCoordinates[region];
+  if (known) return known;
+  return {
+    left: 18 + ((index * 17) % 66),
+    top: 28 + ((index * 13) % 44)
   };
 }
 
@@ -284,10 +313,11 @@ export default function Home() {
   const [bottleResearchError, setBottleResearchError] = useState("");
   const [favoriteBottles, setFavoriteBottles] = useState<string[]>([]);
   const [collectionBottles, setCollectionBottles] = useState<CollectionBottle[]>([]);
+  const [identifiedBottles, setIdentifiedBottles] = useState<CollectionBottle[]>([]);
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionRegion, setCollectionRegion] = useState("All regions");
   const [collectionSort, setCollectionSort] = useState("producer");
-  const [selectedMapRegion, setSelectedMapRegion] = useState<keyof typeof regionalCollection>("Burgundy");
+  const [selectedMapRegion, setSelectedMapRegion] = useState("");
   const [sommelierInput, setSommelierInput] = useState("");
   const [sommelierMessages, setSommelierMessages] = useState<Array<{ role: "assistant" | "user"; text: string }>>([
     { role: "assistant", text: "Good evening. What are you cooking, or what would you like to open?" }
@@ -309,7 +339,7 @@ export default function Home() {
     : ["No bottle", "No service", "No window"];
   const collectionTotal = collectionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
   const visibleBottles = collectionBottles
-    .filter((bottle) => collectionRegion === "All regions" || bottle.region.includes(collectionRegion))
+    .filter((bottle) => collectionRegion === "All regions" || regionLabel(bottle.region) === collectionRegion)
     .filter((bottle) => `${bottle.producer} ${bottle.wine} ${bottle.vintage} ${bottle.region} ${bottle.grapes}`.toLowerCase().includes(collectionSearch.toLowerCase()))
     .sort((a, b) => {
       if (collectionSort === "score") return Number(b.score) - Number(a.score);
@@ -317,13 +347,26 @@ export default function Home() {
       return a.producer.localeCompare(b.producer);
     });
   const readyCount = collectionBottles.filter((bottle) => /peak/i.test(bottle.window)).length;
+  const mapRegions = useMemo(() => {
+    const grouped = new Map<string, CollectionBottle[]>();
+    collectionBottles.forEach((bottle) => {
+      const label = regionLabel(bottle.region);
+      grouped.set(label, [...(grouped.get(label) ?? []), bottle]);
+    });
+    return Array.from(grouped.entries()).map(([region, bottles], index) => ({
+      region,
+      bottles,
+      position: mapPositionForRegion(region, index)
+    }));
+  }, [collectionBottles]);
+  const activeMapRegion = selectedMapRegion || mapRegions[0]?.region || "";
   const cellarStats = [
     [String(collectionTotal), "Bottles"],
     [String(readyCount), "Ready now"],
     [String(Math.max(collectionTotal - readyCount, 0)), "Resting"],
     [String(new Set(collectionBottles.map((bottle) => bottle.region)).size), "Regions"]
   ];
-  const selectedRegionBottles = collectionBottles.filter((bottle) => bottle.region.includes(selectedMapRegion));
+  const selectedRegionBottles = activeMapRegion ? collectionBottles.filter((bottle) => regionLabel(bottle.region) === activeMapRegion) : [];
   const selectedRegionTotal = selectedRegionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
   const selectedRegionReady = selectedRegionBottles.filter((bottle) => /peak/i.test(bottle.window)).length;
   const selectedRegionScore = selectedRegionBottles.length
@@ -336,11 +379,23 @@ export default function Home() {
 
   useEffect(() => {
     setScannerTarget(document.getElementById("hero-scanner-slot"));
+    if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+    if (!window.location.hash) window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
     try {
       localStorage.removeItem("cellar-removed-bottles");
       localStorage.removeItem("cellar-collection-bottles");
       const saved = JSON.parse(localStorage.getItem("cellar-collection-bottles-v2") ?? "[]");
       if (Array.isArray(saved)) setCollectionBottles(saved);
+    } catch {
+      setCollectionBottles([]);
+    }
+    try {
+      const savedIdentified = JSON.parse(localStorage.getItem("cellar-identified-bottles-v1") ?? "[]");
+      if (Array.isArray(savedIdentified)) setIdentifiedBottles(savedIdentified);
+    } catch {
+      setIdentifiedBottles([]);
+    }
+    try {
       const savedFirstName = localStorage.getItem("cellar-profile-first-name") ?? "";
       if (savedFirstName) {
         setFirstName(savedFirstName);
@@ -352,9 +407,19 @@ export default function Home() {
         setProfileCellarName(savedCellarName);
       }
     } catch {
-      setCollectionBottles([]);
+      setFirstName("");
     }
   }, []);
+
+  useEffect(() => {
+    if (!mapRegions.length) {
+      if (selectedMapRegion) setSelectedMapRegion("");
+      return;
+    }
+    if (!mapRegions.some((item) => item.region === selectedMapRegion)) {
+      setSelectedMapRegion(mapRegions[0].region);
+    }
+  }, [mapRegions, selectedMapRegion]);
 
   async function handleBottleImage(file?: File) {
     if (!file) return;
@@ -382,7 +447,9 @@ export default function Home() {
         throw new Error(error.error ?? "AI recognition unavailable.");
       }
       const recognition = await response.json() as AiRecognition;
-      setRecognizedBottle(toCollectionBottle(recognition));
+      const bottle = toCollectionBottle(recognition);
+      setRecognizedBottle(bottle);
+      rememberIdentifiedBottle(bottle);
       setRecognitionStatus(`ChatGPT Vision match: ${recognition.vintage} ${recognition.producer}`);
       return;
     } catch (error) {
@@ -401,10 +468,11 @@ export default function Home() {
   }
 
   function refreshIdentification() {
-    if (!bottleImagePreview) return;
     setRecognizedBottle(null);
     setResearchIndex(-1);
-    setRecognitionStatus("Upload-only recognition refreshes automatically when you choose a new photo.");
+    setBottleImagePreview("");
+    setBottleImageName("No bottle photo selected");
+    setRecognitionStatus("Upload or take a photo to identify the bottle");
     setIsRecognizing(false);
   }
 
@@ -493,6 +561,35 @@ export default function Home() {
     }
   }
 
+  function rememberIdentifiedBottle(bottle: CollectionBottle) {
+    setIdentifiedBottles((current) => {
+      const key = `${bottle.producer}-${bottle.wine}-${bottle.vintage}`;
+      const next = [
+        { ...bottle, quantity: "1 bottle" },
+        ...current.filter((item) => `${item.producer}-${item.wine}-${item.vintage}` !== key)
+      ].slice(0, 12);
+      try {
+        localStorage.setItem("cellar-identified-bottles-v1", JSON.stringify(next));
+      } catch {
+        // Local memory is optional; keep the in-session list even if storage is unavailable.
+      }
+      return next;
+    });
+  }
+
+  function addBottleToCollection(bottle: CollectionBottle) {
+    const key = `${bottle.producer}-${bottle.vintage}`;
+    const existing = collectionBottles.findIndex((item) => `${item.producer}-${item.vintage}` === key);
+    const next = [...collectionBottles];
+    if (existing >= 0) {
+      const quantity = Number.parseInt(next[existing].quantity, 10) + 1;
+      next[existing] = { ...next[existing], quantity: `${quantity} bottles` };
+    } else {
+      next.push({ ...bottle, cellar: cellarName });
+    }
+    persistCollection(next);
+  }
+
   async function openBottleDetails(bottle: CollectionBottle) {
     setActiveBottle(bottle);
     setBottleResearchError("");
@@ -542,16 +639,7 @@ export default function Home() {
 
   function saveResearchedBottle() {
     if (researchIndex < 0 && !recognizedBottle) return;
-    const key = `${researchedBottle.producer}-${researchedBottle.vintage}`;
-    const existing = collectionBottles.findIndex((bottle) => `${bottle.producer}-${bottle.vintage}` === key);
-    const next = [...collectionBottles];
-    if (existing >= 0) {
-      const quantity = Number.parseInt(next[existing].quantity, 10) + 1;
-      next[existing] = { ...next[existing], quantity: `${quantity} bottles` };
-    } else {
-      next.push({ ...researchedBottle, cellar: cellarName });
-    }
-    persistCollection(next);
+    addBottleToCollection(researchedBottle);
   }
 
   function deleteBottle(key: string) {
@@ -614,9 +702,6 @@ export default function Home() {
 
         <header className="relative z-50 mx-auto flex max-w-7xl items-center justify-between rounded-lg border border-white/60 bg-white/42 px-3 py-3 shadow-soft backdrop-blur-md">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-burgundy-900 text-cellar-cream shadow-soft">
-              <Wine className="size-5" aria-hidden />
-            </div>
             <div>
               <p className="font-serif text-xl leading-none tracking-normal">Cellar</p>
               <p className="text-xs uppercase tracking-[0.18em] text-cellar-walnut">Private cellar</p>
@@ -644,7 +729,7 @@ export default function Home() {
                   ["My Bottles", "#my-collection", Grape],
                   ["Full Collection Overview", "#collection-overview", Wine],
                   ["Overall Collection", "#dashboard", LayoutDashboard],
-                  ["Regional Map", "#regional-map", Map],
+                  ["Regional Map", "#regional-map", MapIcon],
                   ["AI Sommelier", "#sommelier", MessageCircle],
                   ["Profile & Settings", "#settings", Settings]
                 ].map(([label, href, Icon]) => {
@@ -983,6 +1068,14 @@ export default function Home() {
                 <div className="rounded-md bg-burgundy-50 px-4 py-3 text-sm font-medium text-burgundy-900">
                   {recognitionStatus}
                 </div>
+                {researchedBottle.tastingNotes?.length ? (
+                  <div className="rounded-md bg-white/78 px-4 py-3">
+                    <p className="text-sm text-cellar-walnut">Tasting notes</p>
+                    <ul className="mt-2 grid list-disc grid-cols-2 gap-x-6 gap-y-1 pl-5 text-sm font-medium">
+                      {researchedBottle.tastingNotes.map((note) => <li key={note}>{note}</li>)}
+                    </ul>
+                  </div>
+                ) : null}
                 {(researchIndex < 0 && !recognizedBottle ? [["Identification", "Awaiting photo"]] : [
                   ["Producer", researchedBottle.producer],
                   ["Wine", researchedBottle.wine],
@@ -1004,14 +1097,6 @@ export default function Home() {
                     <span className="text-right font-medium">{value}</span>
                   </div>
                 ))}
-                {researchedBottle.tastingNotes?.length ? (
-                  <div className="rounded-md bg-white/78 px-4 py-3">
-                    <p className="text-sm text-cellar-walnut">Tasting notes</p>
-                    <ul className="mt-2 grid list-disc grid-cols-2 gap-x-6 gap-y-1 pl-5 text-sm font-medium">
-                      {researchedBottle.tastingNotes.map((note) => <li key={note}>{note}</li>)}
-                    </ul>
-                  </div>
-                ) : null}
                 <button
                   className="w-full rounded-md bg-burgundy-700 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-45"
                   disabled={isRecognizing || (researchIndex < 0 && !recognizedBottle)}
@@ -1027,6 +1112,36 @@ export default function Home() {
                 >
                   {isRecognizing ? "Researching bottle..." : bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving"}
                 </button>
+                {identifiedBottles.length ? (
+                  <div className="rounded-lg border border-cellar-oak/15 bg-white/72 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Memory</p>
+                        <h3 className="font-serif text-2xl">Recently identified</h3>
+                      </div>
+                      <span className="rounded-full bg-cellar-cream px-3 py-1 text-xs font-medium text-cellar-walnut">{identifiedBottles.length} saved</span>
+                    </div>
+                    <div className="grid gap-2">
+                      {identifiedBottles.slice(0, 4).map((bottle) => (
+                        <div className="flex items-center justify-between gap-3 rounded-md bg-cellar-parchment px-3 py-3" key={`${bottle.producer}-${bottle.wine}-${bottle.vintage}`}>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{bottle.vintage} {bottle.producer}</p>
+                            <p className="truncate text-xs text-cellar-walnut">{bottle.wine} / {regionLabel(bottle.region)}</p>
+                          </div>
+                          <button
+                            className="shrink-0 rounded-md bg-burgundy-700 px-3 py-2 text-xs font-medium text-white"
+                            onClick={() => {
+                              addBottleToCollection(bottle);
+                              showDialog("Bottle added to your collection", `${bottle.vintage} ${bottle.producer} ${bottle.wine} has been added to My Bottles.`);
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </Panel>,
@@ -1071,11 +1186,7 @@ export default function Home() {
               </label>
               <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionRegion} onChange={(event) => setCollectionRegion(event.target.value)}>
                 <option>All regions</option>
-                <option>Burgundy</option>
-                <option>Bordeaux</option>
-                <option>Champagne</option>
-                <option>Piedmont</option>
-                <option>Santa Cruz</option>
+                {mapRegions.map(({ region }) => <option key={region}>{region}</option>)}
               </select>
               <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionSort} onChange={(event) => setCollectionSort(event.target.value)}>
                 <option value="producer">Producer A-Z</option>
@@ -1088,15 +1199,19 @@ export default function Home() {
           <p className="mb-4 text-sm font-medium text-cellar-walnut">{visibleBottles.length} collection cards shown</p>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleBottles.map((bottle) => (
-              <article className="overflow-hidden rounded-lg border border-cellar-oak/15 bg-white/82 shadow-soft" key={`${bottle.producer}${bottle.vintage}`}>
-                <div className={`relative h-36 bg-gradient-to-br ${bottle.accent} p-4 text-white`}>
+              <article className="group overflow-hidden rounded-lg border border-cellar-oak/15 bg-white shadow-soft transition hover:-translate-y-0.5 hover:shadow-cellar" key={`${bottle.producer}${bottle.vintage}`}>
+                <div className={`relative h-40 bg-gradient-to-br ${bottle.accent} p-5 text-white`}>
+                  <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/45 to-transparent" />
+                  <div className="absolute right-5 top-5 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-cellar-ink">
+                    {bottle.quantity}
+                  </div>
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-white/65">{bottle.region}</p>
-                      <p className="mt-2 font-serif text-4xl">{bottle.vintage}</p>
+                    <div className="relative min-w-0 pr-20">
+                      <p className="truncate text-xs uppercase tracking-[0.16em] text-white/68">{regionLabel(bottle.region)}</p>
+                      <p className="mt-2 font-serif text-5xl leading-none">{bottle.vintage}</p>
                     </div>
                     <button
-                      className={`grid size-9 place-items-center rounded-md border border-white/25 ${favoriteBottles.includes(bottle.producer) ? "bg-white text-burgundy-700" : "bg-black/15 text-white"}`}
+                      className={`relative grid size-9 place-items-center rounded-md border border-white/25 ${favoriteBottles.includes(bottle.producer) ? "bg-white text-burgundy-700" : "bg-black/15 text-white"}`}
                       aria-label={`Favorite ${bottle.producer}`}
                       aria-pressed={favoriteBottles.includes(bottle.producer)}
                       onClick={() => setFavoriteBottles((current) => current.includes(bottle.producer) ? current.filter((item) => item !== bottle.producer) : [...current, bottle.producer])}
@@ -1104,40 +1219,44 @@ export default function Home() {
                       <Heart className="size-4" fill={favoriteBottles.includes(bottle.producer) ? "currentColor" : "none"} aria-hidden />
                     </button>
                   </div>
+                  <div className="absolute bottom-4 left-5 right-5 flex items-center justify-between gap-3">
+                    <span className="rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-medium text-white">{bottle.style ?? bottle.classification}</span>
+                    <span className="rounded-full bg-cellar-gold px-3 py-1 text-xs font-semibold text-cellar-ink">{bottle.window}</span>
+                  </div>
                 </div>
 
                 <div className="p-5">
                   <p className="text-xs font-medium uppercase tracking-[0.14em] text-burgundy-700">{bottle.producer}</p>
-                  <h3 className="mt-2 font-serif text-2xl leading-7">{bottle.wine}</h3>
-                  <p className="mt-2 text-sm text-cellar-walnut">{bottle.appellation} / {bottle.classification}</p>
+                  <h3 className="mt-2 min-h-14 font-serif text-2xl leading-7">{bottle.wine}</h3>
+                  <p className="mt-2 text-sm font-medium text-cellar-walnut">{bottle.appellation}</p>
                   {bottle.tastingNotes?.length ? (
-                    <ul className="mt-4 grid list-disc grid-cols-2 gap-x-5 gap-y-1 pl-5 text-sm leading-6 text-cellar-walnut">
-                      {bottle.tastingNotes.slice(0, 8).map((note) => <li key={note}>{note}</li>)}
-                    </ul>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {bottle.tastingNotes.slice(0, 6).map((note) => (
+                        <span className="rounded-full bg-burgundy-50 px-3 py-1 text-xs font-medium text-burgundy-900" key={note}>{note}</span>
+                      ))}
+                    </div>
                   ) : (
                     <p className="mt-4 text-sm leading-6 text-cellar-walnut">{bottle.note}</p>
                   )}
 
-                  <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-cellar-oak/15 py-4 text-sm">
+                  <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
                     {[
                       ["Grapes", bottle.grapes],
-                      ["Maturity", bottle.window],
                       ["Drink", bottle.drinkingWindow],
-                      ["Quantity", bottle.quantity],
                       ["Storage", bottle.cellar],
                       ["Service", bottle.service]
                     ].map(([label, value]) => (
-                      <div key={label}>
+                      <div className="rounded-md bg-cellar-parchment p-3" key={label}>
                         <p className="text-[11px] uppercase tracking-[0.12em] text-cellar-walnut">{label}</p>
-                        <p className="mt-1 font-medium">{value}</p>
+                        <p className="mt-1 line-clamp-2 font-medium">{value}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <p className="text-sm"><span className="text-cellar-walnut">Purchased</span> {bottle.purchase} <span className="text-cellar-walnut">/ Current</span> {bottle.market}</p>
+                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-cellar-oak/15 pt-4">
+                    <p className="text-xs leading-5 text-cellar-walnut">Added to {bottle.cellar}<br />{bottle.market}</p>
                     <div className="flex shrink-0 gap-2">
                       <button
-                        className="rounded-md bg-cellar-ink px-3 py-2 text-sm font-medium text-white"
+                        className="rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-white"
                         onClick={() => void openBottleDetails(bottle)}
                       >
                         Full details
@@ -1170,35 +1289,42 @@ export default function Home() {
 
       <section className="bg-cellar-night px-4 py-10 text-cellar-cream sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <Panel dark title="Regional Map" eyebrow="Collection geography" icon={<Map className="size-5" />} id="regional-map">
+          <Panel dark title="Regional Map" eyebrow="Collection geography" icon={<MapIcon className="size-5" />} id="regional-map">
             <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="relative min-h-[360px] overflow-hidden rounded-lg border border-cellar-gold/20 bg-[radial-gradient(circle_at_22%_25%,rgba(199,162,90,0.30),transparent_16%),radial-gradient(circle_at_45%_42%,rgba(143,29,58,0.55),transparent_14%),radial-gradient(circle_at_74%_66%,rgba(91,112,85,0.45),transparent_16%),linear-gradient(135deg,#303b36,#111)] p-4">
-                <div className="absolute inset-x-6 top-6 h-px bg-cellar-gold/20" />
-                <div className="absolute bottom-6 left-8 right-8 h-px bg-cellar-gold/20" />
-                <div className="absolute bottom-10 left-1/3 top-10 w-px bg-cellar-gold/20" />
-                <div className="absolute bottom-12 right-1/4 top-14 w-px bg-cellar-gold/20" />
-                {(Object.keys(regionalCollection) as Array<keyof typeof regionalCollection>).map((region, index) => {
-                  const regionCount = collectionBottles
-                    .filter((bottle) => bottle.region.includes(region))
-                    .reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+              <div className="relative min-h-[380px] overflow-hidden rounded-lg border border-cellar-gold/20 bg-[#172222] p-4">
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.05)_1px,transparent_1px)] [background-size:52px_52px]" />
+                <svg className="absolute inset-0 h-full w-full opacity-70" viewBox="0 0 1000 520" aria-hidden>
+                  <path fill="#52674f" d="M92 160 150 114l86 8 55 47-16 63 34 47-60 44-88-24-72-61z" />
+                  <path fill="#52674f" d="m246 322 64 16 36 54-31 72-50-20-31-70z" />
+                  <path fill="#5d7358" d="m438 137 82-26 95 26 64-5 54 44-28 45-100-2-48 36-90-20-56-41z" />
+                  <path fill="#5d7358" d="m526 245 84 15 46 73-20 102-56 4-36-68-58-39z" />
+                  <path fill="#536a56" d="m684 151 96-31 96 40 40 78-73 40-104-28-71 18-42-52z" />
+                  <path fill="#536a56" d="m786 344 88 16 49 53-35 43-104-16-31-55z" />
+                </svg>
+                {mapRegions.length ? mapRegions.map(({ region, bottles, position }) => {
+                  const regionCount = bottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
                   return (
                   <button
-                    className={`absolute min-w-24 rounded-md border px-3 py-2 text-left text-xs font-medium shadow-soft transition ${selectedMapRegion === region ? "border-cellar-gold bg-white text-burgundy-900 ring-2 ring-cellar-gold" : "border-white/20 bg-cellar-gold text-cellar-ink hover:bg-white"}`}
+                    className={`absolute min-w-24 -translate-x-1/2 -translate-y-1/2 rounded-md border px-3 py-2 text-left text-xs font-medium shadow-soft transition ${activeMapRegion === region ? "border-cellar-gold bg-white text-burgundy-900 ring-2 ring-cellar-gold" : "border-white/20 bg-cellar-gold text-cellar-ink hover:bg-white"}`}
                     key={region}
-                    style={{ left: `${12 + index * 15}%`, top: `${22 + (index % 3) * 20}%` }}
+                    style={{ left: `${position.left}%`, top: `${position.top}%` }}
                     onClick={() => setSelectedMapRegion(region)}
-                    aria-pressed={selectedMapRegion === region}
+                    aria-pressed={activeMapRegion === region}
                   >
                     <span className="flex items-center gap-1"><MapPin className="size-3" aria-hidden /> {region}</span>
                     <span className="mt-1 block text-[11px] opacity-75">{regionCount} bottles</span>
                   </button>
                   );
-                })}
+                }) : (
+                  <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-cellar-cream/70">
+                    Add a bottle and Cellar will place its origin on the world map.
+                  </div>
+                )}
               </div>
               <div className="space-y-3">
                 <div className="rounded-md border border-cellar-gold/25 bg-white/10 p-5">
                   <p className="text-xs uppercase tracking-[0.16em] text-cellar-gold">Selected region</p>
-                  <h3 className="mt-2 font-serif text-3xl text-white">{selectedMapRegion}</h3>
+                  <h3 className="mt-2 font-serif text-3xl text-white">{activeMapRegion || "No regions yet"}</h3>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div><p className="text-cellar-cream/55">Bottles</p><p className="mt-1 font-medium text-white">{selectedRegionTotal}</p></div>
                     <div><p className="text-cellar-cream/55">Ready now</p><p className="mt-1 font-medium text-white">{selectedRegionReady}</p></div>
@@ -1208,10 +1334,11 @@ export default function Home() {
                   <p className="mt-4 text-sm text-cellar-cream/65">Top bottle: {selectedRegionTopBottle ? `${selectedRegionTopBottle.vintage} ${selectedRegionTopBottle.producer}` : "None yet"}</p>
                   <p className="mt-2 text-sm text-cellar-cream/65">Ready now: {selectedRegionReadyBottles.length ? selectedRegionReadyBottles.map((bottle) => `${bottle.vintage} ${bottle.producer}`).join(", ") : "No bottles ready in this region yet"}</p>
                 </div>
+                {mapRegions.length ? (
                 <div className="grid grid-cols-2 gap-2">
-                  {(Object.keys(regionalCollection) as Array<keyof typeof regionalCollection>).map((region) => (
+                  {mapRegions.map(({ region }) => (
                     <button
-                      className={`rounded-md p-3 text-left text-sm transition ${selectedMapRegion === region ? "bg-cellar-gold text-cellar-ink" : "bg-white/8 text-white hover:bg-white/14"}`}
+                      className={`rounded-md p-3 text-left text-sm transition ${activeMapRegion === region ? "bg-cellar-gold text-cellar-ink" : "bg-white/8 text-white hover:bg-white/14"}`}
                       key={region}
                       onClick={() => setSelectedMapRegion(region)}
                     >
@@ -1219,11 +1346,13 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
+                ) : null}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     className="inline-flex items-center justify-center gap-2 rounded-md bg-cellar-gold px-3 py-3 text-sm font-medium text-cellar-ink"
+                    disabled={!activeMapRegion}
                     onClick={() => {
-                      setCollectionRegion(selectedMapRegion);
+                      setCollectionRegion(activeMapRegion);
                       document.getElementById("my-collection")?.scrollIntoView({ behavior: "smooth" });
                     }}
                   >
@@ -1232,11 +1361,12 @@ export default function Home() {
                   </button>
                   <button
                     className="inline-flex items-center justify-center gap-2 rounded-md bg-white/10 px-3 py-3 text-sm font-medium text-white hover:bg-white/15"
+                    disabled={!activeMapRegion}
                     onClick={() => showDialog(
-                      `${selectedMapRegion} summary`,
+                      `${activeMapRegion || "Region"} summary`,
                       selectedRegionBottles.length
-                        ? `${cellarName} has ${selectedRegionTotal} bottle${selectedRegionTotal === 1 ? "" : "s"} from ${selectedMapRegion}. Average score is ${selectedRegionScore}. ${selectedRegionTopBottle ? `The strongest card is ${selectedRegionTopBottle.vintage} ${selectedRegionTopBottle.producer} ${selectedRegionTopBottle.wine}.` : ""}`
-                        : `${cellarName} does not have bottles from ${selectedMapRegion} yet.`
+                        ? `${cellarName} has ${selectedRegionTotal} bottle${selectedRegionTotal === 1 ? "" : "s"} from ${activeMapRegion}. Average score is ${selectedRegionScore}. ${selectedRegionTopBottle ? `The strongest card is ${selectedRegionTopBottle.vintage} ${selectedRegionTopBottle.producer} ${selectedRegionTopBottle.wine}.` : ""}`
+                        : `${cellarName} does not have bottles from ${activeMapRegion || "this region"} yet.`
                     )}
                   >
                     <Sparkles className="size-4" aria-hidden />
