@@ -15,6 +15,8 @@ type WineResearch = {
   tastingNotes: string[];
   communityRating: string;
   communityConsensus: string;
+  marketPriceRange: string;
+  marketPriceNote: string;
   criticScores: Array<{
     source: string;
     score: string;
@@ -58,6 +60,8 @@ const schema = {
     },
     communityRating: { type: "string" },
     communityConsensus: { type: "string" },
+    marketPriceRange: { type: "string" },
+    marketPriceNote: { type: "string" },
     criticScores: {
       type: "array",
       items: {
@@ -107,7 +111,7 @@ const schema = {
   },
   required: [
     "summary", "wineColor", "nose", "palate", "finish", "tastingNotes", "communityRating",
-    "communityConsensus", "criticScores", "drinkWindow",
+    "communityConsensus", "marketPriceRange", "marketPriceNote", "criticScores", "drinkWindow",
     "communityPairings", "sommelierPairings", "sources"
   ]
 };
@@ -172,9 +176,12 @@ export async function POST(request: Request) {
     "Paraphrase tasting notes briefly. Do not reproduce long critic or community reviews.",
     "Return 10 to 16 concise one- or two-word aroma and flavor descriptors in tastingNotes.",
     "Label every critic score with its source. Keep community ratings separate from professional scores.",
+    "Find current retail listings for one standard 750 ml bottle of the exact wine and vintage, prioritizing UK merchants and GBP prices. Return a concise low-to-high per-bottle range such as '£45-£65 per 750 ml bottle' in marketPriceRange.",
+    "Exclude auction lots, restaurant lists, mixed cases, and other vintages. If fewer than two comparable exact-vintage retail listings are available, say 'Not enough current listings' and explain that in marketPriceNote.",
+    "In marketPriceNote, briefly state the number and kind of comparable listings used, that prices may exclude delivery or tax where applicable, and the date-sensitive nature of the estimate.",
     "Build the drink window from cited exact-vintage evidence when available; otherwise provide a conservative estimate and clearly say it is a sommelier estimate.",
     "Use community pairing recommendations when they are actually found. Put your own wine-knowledge suggestions only in sommelierPairings.",
-    "Include direct source URLs for every factual rating, note, or window used."
+    "Include direct source URLs for every factual rating, note, price, or window used."
   ].join("\n");
 
   const model = process.env.OPENAI_RESEARCH_MODEL ?? process.env.OPENAI_WINE_MODEL ?? "gpt-5.4";

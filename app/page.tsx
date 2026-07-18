@@ -40,6 +40,8 @@ type WineResearch = {
   tastingNotes: string[];
   communityRating: string;
   communityConsensus: string;
+  marketPriceRange: string;
+  marketPriceNote: string;
   criticScores: Array<{
     source: string;
     score: string;
@@ -78,6 +80,7 @@ type CollectionBottle = {
   quantity: string;
   purchase: string;
   market: string;
+  priceRange?: string;
   service: string;
   note: string;
   accent: string;
@@ -90,6 +93,7 @@ type CollectionBottle = {
   foodPairing?: string;
   tastingNotes?: string[];
   research?: WineResearch;
+  scannedAt?: string;
 };
 
 const researchedWines: CollectionBottle[] = [
@@ -97,7 +101,7 @@ const researchedWines: CollectionBottle[] = [
     producer: "Domaine Leflaive", wine: "Puligny-Montrachet 1er Cru Les Pucelles", vintage: "2020",
     region: "Burgundy, France", appellation: "Puligny-Montrachet Premier Cru", grapes: "100% Chardonnay",
     classification: "Premier Cru", cellar: "Location not set", score: "96", window: "Approaching peak",
-    drinkingWindow: "2027-2042", quantity: "1 bottle", purchase: "Not added", market: "Researching",
+    drinkingWindow: "2027-2042", quantity: "1 bottle", purchase: "Not added", market: "Researching", priceRange: "Research pending",
     service: "12 C / no decant", note: "White flowers, Meyer lemon, citrus oil, hazelnut, and crushed chalk. Layered, satin-textured, and mineral.",
     accent: "from-[#a48b55] to-[#596659]"
   },
@@ -105,7 +109,7 @@ const researchedWines: CollectionBottle[] = [
     producer: "Ridge Vineyards", wine: "Monte Bello Cabernet Sauvignon", vintage: "2019",
     region: "Santa Cruz Mountains, USA", appellation: "Santa Cruz Mountains", grapes: "Cabernet Sauvignon blend",
     classification: "Estate wine", cellar: "Location not set", score: "96", window: "Needs aging",
-    drinkingWindow: "2032-2065", quantity: "1 bottle", purchase: "Not added", market: "Researching",
+    drinkingWindow: "2032-2065", quantity: "1 bottle", purchase: "Not added", market: "Researching", priceRange: "Research pending",
     service: "17 C / 90 min decant", note: "Mountain cassis, mint, crushed stone, cedar, and savory herbs framed by fresh acidity and firm tannins.",
     accent: "from-cellar-moss to-cellar-slate"
   },
@@ -113,7 +117,7 @@ const researchedWines: CollectionBottle[] = [
     producer: "Giacomo Conterno", wine: "Barolo Monfortino Riserva", vintage: "2013",
     region: "Piedmont, Italy", appellation: "Barolo DOCG", grapes: "100% Nebbiolo",
     classification: "Riserva", cellar: "Location not set", score: "99", window: "Entering peak",
-    drinkingWindow: "2026-2055", quantity: "1 bottle", purchase: "Not added", market: "Researching",
+    drinkingWindow: "2026-2055", quantity: "1 bottle", purchase: "Not added", market: "Researching", priceRange: "Research pending",
     service: "18 C / 180 min decant", note: "Rose, tar, red fruit, iron, and alpine herbs; profound, detailed, and still gaining complexity.",
     accent: "from-[#7a2832] to-[#34211d]"
   }
@@ -245,6 +249,7 @@ function toCollectionBottle(recognition: AiRecognition): CollectionBottle {
     quantity: "1 bottle",
     purchase: "Not added",
     market: "Researching",
+    priceRange: "Research after opening details",
     service: recognition.service || "Confirm serving guidance",
     note: recognition.note || "AI recognition completed, but tasting detail was limited.",
     tastingNotes: recognition.tastingNotes,
@@ -313,7 +318,7 @@ export default function Home() {
   const [bottleResearchError, setBottleResearchError] = useState("");
   const [favoriteBottles, setFavoriteBottles] = useState<string[]>([]);
   const [collectionBottles, setCollectionBottles] = useState<CollectionBottle[]>([]);
-  const [identifiedBottles, setIdentifiedBottles] = useState<CollectionBottle[]>([]);
+  const [checkedBottles, setCheckedBottles] = useState<CollectionBottle[]>([]);
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionRegion, setCollectionRegion] = useState("All regions");
   const [collectionSort, setCollectionSort] = useState("producer");
@@ -390,10 +395,10 @@ export default function Home() {
       setCollectionBottles([]);
     }
     try {
-      const savedIdentified = JSON.parse(localStorage.getItem("cellar-identified-bottles-v1") ?? "[]");
-      if (Array.isArray(savedIdentified)) setIdentifiedBottles(savedIdentified);
+      const savedChecks = JSON.parse(localStorage.getItem("cellar-checked-bottles-v1") ?? "[]");
+      if (Array.isArray(savedChecks)) setCheckedBottles(savedChecks);
     } catch {
-      setIdentifiedBottles([]);
+      setCheckedBottles([]);
     }
     try {
       const savedFirstName = localStorage.getItem("cellar-profile-first-name") ?? "";
@@ -449,7 +454,7 @@ export default function Home() {
       const recognition = await response.json() as AiRecognition;
       const bottle = toCollectionBottle(recognition);
       setRecognizedBottle(bottle);
-      rememberIdentifiedBottle(bottle);
+      if (bottleIntent === "checking") rememberCheckedBottle(bottle);
       setRecognitionStatus(`ChatGPT Vision match: ${recognition.vintage} ${recognition.producer}`);
       return;
     } catch (error) {
@@ -561,15 +566,15 @@ export default function Home() {
     }
   }
 
-  function rememberIdentifiedBottle(bottle: CollectionBottle) {
-    setIdentifiedBottles((current) => {
+  function rememberCheckedBottle(bottle: CollectionBottle) {
+    setCheckedBottles((current) => {
       const key = `${bottle.producer}-${bottle.wine}-${bottle.vintage}`;
       const next = [
-        { ...bottle, quantity: "1 bottle" },
+        { ...bottle, quantity: "1 bottle", scannedAt: new Date().toISOString() },
         ...current.filter((item) => `${item.producer}-${item.wine}-${item.vintage}` !== key)
       ].slice(0, 12);
       try {
-        localStorage.setItem("cellar-identified-bottles-v1", JSON.stringify(next));
+        localStorage.setItem("cellar-checked-bottles-v1", JSON.stringify(next));
       } catch {
         // Local memory is optional; keep the in-session list even if storage is unavailable.
       }
@@ -621,6 +626,8 @@ export default function Home() {
           ? `${research.drinkWindow.start}-${research.drinkWindow.end}`
           : bottle.drinkingWindow,
         window: research.drinkWindow.status || bottle.window,
+        priceRange: research.marketPriceRange || bottle.priceRange,
+        market: research.marketPriceRange || bottle.market,
         foodPairing: [...research.communityPairings, ...research.sommelierPairings].join(", ") || bottle.foodPairing
       };
       setActiveBottle(updatedBottle);
@@ -1085,6 +1092,7 @@ export default function Home() {
                   ["Grapes", researchedBottle.grapes],
                   ["Style", researchedBottle.style ?? researchedBottle.classification],
                   ["Classification", researchedBottle.classification],
+                  ["Bottle price range", researchedBottle.priceRange || "Research after opening details"],
                   ["Drinking window", researchedBottle.drinkingWindow],
                   ["Serving", researchedBottle.service],
                   ["Producer notes", researchedBottle.producerHistory ?? "Available when AI recognition is connected"],
@@ -1102,32 +1110,35 @@ export default function Home() {
                   disabled={isRecognizing || (researchIndex < 0 && !recognizedBottle)}
                   onClick={() => {
                     if (bottleIntent === "collection") saveResearchedBottle();
+                    if (bottleIntent === "checking") rememberCheckedBottle(researchedBottle);
                     showDialog(
-                      bottleIntent === "collection" ? "Bottle added to your collection" : "Wine identified, not saved",
+                      bottleIntent === "collection" ? "Bottle added to your collection" : "Bottle saved to scan history",
                       bottleIntent === "collection"
                         ? "The researched wine, tasting notes, drinking window, grapes, classification, and service guidance have been saved to My Bottles."
-                        : `${researchedBottle.note} This research was not saved to your collection.`
+                        : `${researchedBottle.note} This bottle is in your Just checking history, but was not added to your collection.`
                     );
                   }}
                 >
-                  {isRecognizing ? "Researching bottle..." : bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving"}
+                  {isRecognizing ? "Researching bottle..." : bottleIntent === "collection" ? "Identify and add bottle" : "Check bottle"}
                 </button>
-                {identifiedBottles.length ? (
+                {checkedBottles.length ? (
                   <div className="rounded-lg border border-cellar-oak/15 bg-white/72 p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Memory</p>
-                        <h3 className="font-serif text-2xl">Recently identified</h3>
+                        <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Just checking</p>
+                        <h3 className="font-serif text-2xl">Scan history</h3>
                       </div>
-                      <span className="rounded-full bg-cellar-cream px-3 py-1 text-xs font-medium text-cellar-walnut">{identifiedBottles.length} saved</span>
+                      <span className="rounded-full bg-cellar-cream px-3 py-1 text-xs font-medium text-cellar-walnut">{checkedBottles.length} checked</span>
                     </div>
                     <div className="grid gap-2">
-                      {identifiedBottles.slice(0, 4).map((bottle) => (
+                      {checkedBottles.map((bottle) => (
                         <div className="flex items-center justify-between gap-3 rounded-md bg-cellar-parchment px-3 py-3" key={`${bottle.producer}-${bottle.wine}-${bottle.vintage}`}>
-                          <div className="min-w-0">
+                          <button className="min-w-0 flex-1 text-left" onClick={() => void openBottleDetails(bottle)}>
                             <p className="truncate text-sm font-semibold">{bottle.vintage} {bottle.producer}</p>
                             <p className="truncate text-xs text-cellar-walnut">{bottle.wine} / {regionLabel(bottle.region)}</p>
-                          </div>
+                            <p className="mt-1 text-[11px] font-medium text-burgundy-700">Per-bottle range: {bottle.priceRange || "Research pending"}</p>
+                            {bottle.scannedAt ? <p className="mt-1 text-[11px] text-cellar-walnut">Checked {new Date(bottle.scannedAt).toLocaleString()}</p> : null}
+                          </button>
                           <button
                             className="shrink-0 rounded-md bg-burgundy-700 px-3 py-2 text-xs font-medium text-white"
                             onClick={() => {
@@ -1229,6 +1240,9 @@ export default function Home() {
                   <p className="text-xs font-medium uppercase tracking-[0.14em] text-burgundy-700">{bottle.producer}</p>
                   <h3 className="mt-2 min-h-14 font-serif text-2xl leading-7">{bottle.wine}</h3>
                   <p className="mt-2 text-sm font-medium text-cellar-walnut">{bottle.appellation}</p>
+                  <div className="mt-3 inline-flex rounded-full bg-cellar-parchment px-3 py-1 text-xs font-semibold text-burgundy-900">
+                    Per-bottle price range: {bottle.priceRange || "Research pending"}
+                  </div>
                   {bottle.tastingNotes?.length ? (
                     <div className="mt-4 flex flex-wrap gap-2">
                       {bottle.tastingNotes.slice(0, 6).map((note) => (
@@ -1243,6 +1257,7 @@ export default function Home() {
                     {[
                       ["Grapes", bottle.grapes],
                       ["Drink", bottle.drinkingWindow],
+                      ["Bottle price range", bottle.priceRange || "Research after opening details"],
                       ["Storage", bottle.cellar],
                       ["Service", bottle.service]
                     ].map(([label, value]) => (
@@ -1253,7 +1268,7 @@ export default function Home() {
                     ))}
                   </div>
                   <div className="mt-5 flex items-center justify-between gap-3 border-t border-cellar-oak/15 pt-4">
-                    <p className="text-xs leading-5 text-cellar-walnut">Added to {bottle.cellar}<br />{bottle.market}</p>
+                    <p className="text-xs leading-5 text-cellar-walnut">Added to {bottle.cellar}<br />Per bottle: {bottle.priceRange || "Research after opening details"}</p>
                     <div className="flex shrink-0 gap-2">
                       <button
                         className="rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-white"
@@ -1518,6 +1533,11 @@ export default function Home() {
                         <div><p className="text-cellar-walnut">Drink by</p><p className="mt-1 font-medium">{activeBottle.research.drinkWindow.end}</p></div>
                       </div>
                       <p className="mt-4 text-sm leading-6 text-cellar-walnut">{activeBottle.research.drinkWindow.reason}</p>
+                      <div className="mt-5 rounded-md bg-white/55 p-4">
+                        <p className="text-xs uppercase tracking-[0.14em] text-burgundy-700">Current per-bottle price range</p>
+                        <p className="mt-2 font-serif text-2xl">{activeBottle.research.marketPriceRange}</p>
+                        <p className="mt-2 text-sm leading-6 text-cellar-walnut">{activeBottle.research.marketPriceNote}</p>
+                      </div>
                     </div>
                   </section>
 
@@ -1548,7 +1568,8 @@ export default function Home() {
                     ["Appellation", activeBottle.appellation],
                     ["Grapes", activeBottle.grapes],
                     ["Service", activeBottle.service],
-                    ["Current window", activeBottle.drinkingWindow]
+                    ["Current window", activeBottle.drinkingWindow],
+                    ["Bottle price range", activeBottle.priceRange || "Research after opening details"]
                   ].map(([label, value]) => (
                     <div key={label}>
                       <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">{label}</p>

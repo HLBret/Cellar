@@ -479,6 +479,16 @@
       .wine-card h3 { min-height: 58px; margin: 7px 0 0; font: 500 25px/1.15 Georgia, serif; }
       .wine-card-meta, .wine-card-note { color: var(--oak); font-size: 14px; line-height: 1.55; }
       .wine-card-note { margin-top: 14px; }
+      .wine-price-pill {
+        display: inline-flex;
+        margin-top: 12px;
+        border-radius: 999px;
+        background: var(--paper);
+        color: var(--wine);
+        padding: 7px 11px;
+        font-size: 12px;
+        font-weight: 800;
+      }
       .wine-note-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
       .wine-note-pills span { border-radius: 999px; background: #fbf2f4; color: var(--wine); padding: 6px 10px; font-size: 12px; font-weight: 800; }
       .wine-details {
@@ -684,6 +694,52 @@
         font-weight: 700;
       }
       .scanner-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+      .scan-history {
+        margin-top: 16px;
+        border: 1px solid rgba(142,96,72,.16);
+        border-radius: 8px;
+        background: rgba(255,255,255,.72);
+        padding: 14px;
+      }
+      .scan-history-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .scan-history-head h3 { margin: 3px 0 0; font: 500 24px Georgia, serif; }
+      .scan-count {
+        border-radius: 999px;
+        background: var(--cream);
+        color: var(--oak);
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .scan-history-list { display: grid; gap: 8px; }
+      .scan-history-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-radius: 6px;
+        background: var(--paper);
+        padding: 11px;
+      }
+      .scan-history-item strong,
+      .scan-history-item span,
+      .scan-history-item small { display: block; }
+      .scan-history-item span { margin-top: 2px; color: var(--oak); font-size: 12px; }
+      .scan-history-item small { margin-top: 3px; color: var(--burgundy); font-size: 11px; font-weight: 800; }
+      .scan-history-item button {
+        flex: 0 0 auto;
+        border-radius: 6px;
+        background: var(--burgundy);
+        color: white;
+        padding: 9px 12px;
+        font-weight: 800;
+      }
       .refresh-scan {
         width: 36px;
         height: 36px;
@@ -1076,6 +1132,13 @@
               <div class="recognition-status" id="recognition-status">Upload or take a photo to identify the bottle</div>
               <div id="recognition-details"></div>
               <button class="identify-action" id="identify-action" disabled>Identify and add bottle</button>
+              <div class="scan-history" id="scan-history" hidden>
+                <div class="scan-history-head">
+                  <div><p class="eyebrow">Just checking</p><h3>Scan history</h3></div>
+                  <span class="scan-count" id="scan-history-count">0 checked</span>
+                </div>
+                <div class="scan-history-list" id="scan-history-list"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -1177,16 +1240,26 @@
       const identifyAction = document.getElementById("identify-action");
       const refreshIdentification = document.getElementById("refresh-identification");
       const recognitionDetails = document.getElementById("recognition-details");
+      const scanHistory = document.getElementById("scan-history");
+      const scanHistoryCount = document.getElementById("scan-history-count");
+      const scanHistoryList = document.getElementById("scan-history-list");
       let bottleIntent = "collection";
       let bottlePhotoReady = false;
       let currentResearchIndex = -1;
+      let checkedBottles = [];
+      try {
+        const savedChecks = JSON.parse(localStorage.getItem("cellar-checked-bottles-v1") || "[]");
+        if (Array.isArray(savedChecks)) checkedBottles = savedChecks;
+      } catch (error) {
+        checkedBottles = [];
+      }
       const researchedWines = [
         {
           producer: "Domaine Leflaive", wine: "Puligny-Montrachet 1er Cru Les Pucelles", vintage: "2020",
           region: "Burgundy, France", appellation: "Puligny-Montrachet Premier Cru", classification: "Premier Cru",
           grapes: "100% Chardonnay", score: 96, maturity: "Approaching peak", window: "2027-2042",
           quantity: "1 bottle", storage: "Location not set", service: "12 C / no decant", purchase: "Not added",
-          market: "Researching", color: "linear-gradient(135deg,#a48b55,#596659)",
+          market: "£450-£650 per 750 ml bottle", priceRange: "£450-£650 per 750 ml bottle", color: "linear-gradient(135deg,#a48b55,#596659)",
           confidence: 91,
           sources: ["Preview fallback", "OpenAI Vision-ready research schema"],
           alternatives: ["Domaine Leflaive Clavoillon", "Etienne Sauzet Les Combettes"],
@@ -1201,7 +1274,7 @@
           region: "Santa Cruz Mountains, USA", appellation: "Santa Cruz Mountains", classification: "Estate wine",
           grapes: "Cabernet Sauvignon blend", score: 96, maturity: "Needs aging", window: "2032-2065",
           quantity: "1 bottle", storage: "Location not set", service: "17 C / 90 min decant", purchase: "Not added",
-          market: "Researching", color: "linear-gradient(135deg,#637456,#4e5b5b)",
+          market: "£190-£280 per 750 ml bottle", priceRange: "£190-£280 per 750 ml bottle", color: "linear-gradient(135deg,#637456,#4e5b5b)",
           confidence: 88,
           sources: ["Preview fallback", "OpenAI Vision-ready research schema"],
           alternatives: ["Ridge Estate Cabernet Sauvignon", "Ridge Monte Bello older vintage"],
@@ -1216,7 +1289,7 @@
           region: "Piedmont, Italy", appellation: "Barolo DOCG", classification: "Riserva",
           grapes: "100% Nebbiolo", score: 99, maturity: "Entering peak", window: "2026-2055",
           quantity: "1 bottle", storage: "Location not set", service: "18 C / 180 min decant", purchase: "Not added",
-          market: "Researching", color: "linear-gradient(135deg,#7a2832,#34211d)",
+          market: "£1,100-£1,700 per 750 ml bottle", priceRange: "£1,100-£1,700 per 750 ml bottle", color: "linear-gradient(135deg,#7a2832,#34211d)",
           confidence: 93,
           sources: ["Preview fallback", "OpenAI Vision-ready research schema"],
           alternatives: ["Giacomo Conterno Cascina Francia", "Roberto Conterno Barolo Francia"],
@@ -1230,6 +1303,48 @@
 
       function currentResearchedWine() {
         return currentResearchIndex >= 0 ? researchedWines[currentResearchIndex] : null;
+      }
+
+      function persistCheckedBottles() {
+        try {
+          localStorage.setItem("cellar-checked-bottles-v1", JSON.stringify(checkedBottles));
+        } catch (error) {
+          console.warn("Scan history could not be saved on this device.");
+        }
+      }
+
+      function rememberCheckedBottle(wine) {
+        const key = `${wine.producer}-${wine.wine}-${wine.vintage}`;
+        checkedBottles = [
+          { ...wine, quantity: "1 bottle", scannedAt: new Date().toISOString() },
+          ...checkedBottles.filter((item) => `${item.producer}-${item.wine}-${item.vintage}` !== key)
+        ].slice(0, 12);
+        persistCheckedBottles();
+        renderCheckedHistory();
+      }
+
+      function renderCheckedHistory() {
+        scanHistory.hidden = checkedBottles.length === 0;
+        scanHistoryCount.textContent = `${checkedBottles.length} checked`;
+        scanHistoryList.innerHTML = checkedBottles.map((wine, index) => `
+          <div class="scan-history-item">
+            <div>
+              <strong>${wine.vintage} ${wine.producer}</strong>
+              <span>${wine.wine} / ${regionLabel(wine.region)}</span>
+              <small>Per-bottle range: ${wine.priceRange || wine.market || "Research pending"}</small>
+              ${wine.scannedAt ? `<span>Checked ${new Date(wine.scannedAt).toLocaleString()}</span>` : ""}
+            </div>
+            <button type="button" data-add-checked="${index}">Add</button>
+          </div>
+        `).join("");
+        scanHistoryList.querySelectorAll("[data-add-checked]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const wine = checkedBottles[Number(button.dataset.addChecked)];
+            if (!wine) return;
+            addBottleToCollection(wine);
+            openActionModal("Bottle added to your collection", `${wine.vintage} ${wine.producer} ${wine.wine} has been added to My Bottles.`);
+          });
+        });
       }
 
       function renderRecognition() {
@@ -1248,6 +1363,7 @@
         const details = [
           ["Producer", wine.producer], ["Wine", wine.wine], ["Vintage", wine.vintage], ["Region", wine.region],
           ["Appellation", wine.appellation], ["Grapes", wine.grapes], ["Classification", wine.classification],
+          ["Bottle price range", wine.priceRange || "Research after opening details"],
           ["Drinking window", wine.window], ["Serving", wine.service],
           ["Producer notes", wine.producerHistory || "Detailed producer notes require AI recognition."],
           ["Vintage notes", wine.vintageSummary || "Detailed vintage notes require AI recognition."],
@@ -1276,7 +1392,7 @@
           choice.classList.toggle("active", active);
           choice.setAttribute("aria-pressed", String(active));
         });
-        identifyAction.textContent = bottleIntent === "collection" ? "Identify and add bottle" : "Identify without saving";
+        identifyAction.textContent = bottleIntent === "collection" ? "Identify and add bottle" : "Check bottle";
         if (bottlePhotoReady) {
           const wine = currentResearchedWine();
           recognitionStatus.textContent = bottleIntent === "collection"
@@ -1308,12 +1424,13 @@
       identifyAction.addEventListener("click", () => {
         if (!bottlePhotoReady || !currentResearchedWine()) return;
         if (bottleIntent === "collection") saveResearchedBottle();
+        if (bottleIntent === "checking") rememberCheckedBottle(currentResearchedWine());
         const researchedBottle = currentResearchedWine();
         openActionModal(
-          bottleIntent === "collection" ? "Bottle added to your collection" : "Wine identified, not saved",
+          bottleIntent === "collection" ? "Bottle added to your collection" : "Bottle saved to scan history",
           bottleIntent === "collection"
             ? "The wine, tasting notes, drinking window, grapes, classification, and service guidance are saved in My Bottles."
-            : `${researchedBottle.note} This research was not saved to your collection.`
+            : `${researchedBottle.note} This bottle is in your Just checking history, but was not added to your collection.`
         );
       });
       refreshIdentification.addEventListener("click", refreshWineIdentification);
@@ -1337,6 +1454,7 @@
         handleBottleFile(event.dataTransfer.files[0]);
       });
       renderRecognition();
+      renderCheckedHistory();
 
       const locationQuery = document.getElementById("location-query");
       const searchLocationButton = document.getElementById("search-location");
@@ -1492,20 +1610,24 @@
         collectionRegion.value = current === "All regions" || regions.includes(current) ? current : "All regions";
       }
 
-      function saveResearchedBottle() {
-        const researchedBottle = currentResearchedWine();
-        if (!researchedBottle) return;
-        const key = `${researchedBottle.producer}-${researchedBottle.vintage}`;
+      function addBottleToCollection(wine) {
+        const key = `${wine.producer}-${wine.vintage}`;
         const existing = collectionBottles.findIndex((wine) => `${wine.producer}-${wine.vintage}` === key);
         if (existing >= 0) {
           const quantity = Number.parseInt(collectionBottles[existing].quantity, 10) + 1;
           collectionBottles[existing].quantity = `${quantity} bottles`;
         } else {
-          collectionBottles.push({ ...researchedBottle, storage: activeCellarName });
+          collectionBottles.push({ ...wine, storage: activeCellarName });
         }
         persistCollection();
         updateCollectionStats();
         renderCollection();
+      }
+
+      function saveResearchedBottle() {
+        const researchedBottle = currentResearchedWine();
+        if (!researchedBottle) return;
+        addBottleToCollection(researchedBottle);
       }
 
       function updateCollectionStats() {
@@ -1551,19 +1673,21 @@
               <div class="wine-card-producer">${wine.producer}</div>
               <h3>${wine.wine}</h3>
               <p class="wine-card-meta">${wine.appellation}</p>
+              <div class="wine-price-pill">Per-bottle price range: ${wine.priceRange || wine.market || "Research pending"}</div>
               ${(wine.tastingNotes || []).length
                 ? `<div class="wine-note-pills">${wine.tastingNotes.slice(0, 6).map((note) => `<span>${note}</span>`).join("")}</div>`
                 : `<p class="wine-card-note">${wine.note}</p>`}
               <div class="wine-details">
                 <div><small>Grapes</small><b>${wine.grapes}</b></div>
                 <div><small>Drink</small><b>${wine.window}</b></div>
+                <div><small>Bottle price range</small><b>${wine.priceRange || wine.market || "Research pending"}</b></div>
                 <div><small>Storage</small><b>${wine.storage}</b></div>
                 <div><small>Service</small><b>${wine.service}</b></div>
               </div>
               <div class="wine-card-foot">
-                <p>Added to ${wine.storage}<br>${wine.market}</p>
+                <p>Added to ${wine.storage}<br>Per bottle: ${wine.priceRange || wine.market || "Research pending"}</p>
                 <div class="wine-card-actions">
-                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
+                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Per-bottle price range ${wine.priceRange || wine.market || "Research pending"}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
                   <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
                 </div>
               </div>
