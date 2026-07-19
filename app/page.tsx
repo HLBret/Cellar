@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 
 type WineResearch = {
   summary: string;
@@ -97,6 +96,7 @@ type CollectionBottle = {
 };
 
 type CurrencyCode = "GBP" | "USD" | "EUR";
+type ViewId = "home" | "add-bottle" | "collection-overview" | "dashboard" | "my-collection" | "regional-map" | "sommelier" | "settings";
 
 type ExchangeRates = Record<CurrencyCode, number>;
 
@@ -357,7 +357,28 @@ function displayPriceRange(priceRange: string | undefined, currency: CurrencyCod
   return `${formatCurrencyAmount(Math.min(...converted), currency)}-${formatCurrencyAmount(Math.max(...converted), currency)} ${suffix}`;
 }
 
+function wineTypeForBottle(bottle: CollectionBottle) {
+  const text = `${bottle.style ?? ""} ${bottle.classification} ${bottle.wine} ${bottle.grapes} ${bottle.appellation}`.toLowerCase();
+  if (/sparkling|champagne|prosecco|cava|franciacorta|pet[- ]?nat|crémant|cremant/.test(text)) return "Sparkling";
+  if (/rosé|rose wine|rosado|rosato/.test(text)) return "Rosé";
+  if (/orange wine|skin contact|amber wine/.test(text)) return "Orange";
+  const whiteMatches = text.match(/white|blanc|bianco|blanco|chardonnay|riesling|sauvignon blanc|chenin blanc|pinot grigio|pinot gris|albariño|albarino|viura|macabeo|verdejo|semillon|sémillon|gewürztraminer|gewurztraminer|grüner|gruner/g)?.length ?? 0;
+  const redMatches = text.match(/red|rouge|rosso|tinto|cabernet|merlot|pinot noir|nebbiolo|syrah|shiraz|grenache|garnacha|sangiovese|tempranillo|malbec|zinfandel|mourvèdre|mourvedre|gamay/g)?.length ?? 0;
+  if (redMatches > whiteMatches) return "Red";
+  if (whiteMatches > redMatches) return "White";
+  return "Other";
+}
+
+function viewFromHash(hash: string): ViewId {
+  const value = hash.replace("#", "");
+  if (["add-bottle", "collection-overview", "dashboard", "my-collection", "regional-map", "sommelier", "settings"].includes(value)) {
+    return value as ViewId;
+  }
+  return "home";
+}
+
 export default function Home() {
+  const [activeView, setActiveView] = useState<ViewId>("home");
   const [liveTonight, setLiveTonight] = useState<TonightProfile | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
   const [locationStatus, setLocationStatus] = useState("");
@@ -377,6 +398,10 @@ export default function Home() {
   const [checkedBottles, setCheckedBottles] = useState<CollectionBottle[]>([]);
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionRegion, setCollectionRegion] = useState("All regions");
+  const [collectionType, setCollectionType] = useState("All types");
+  const [collectionGrape, setCollectionGrape] = useState("All grapes");
+  const [collectionWindow, setCollectionWindow] = useState("All windows");
+  const [collectionResearch, setCollectionResearch] = useState("All research");
   const [collectionSort, setCollectionSort] = useState("producer");
   const [selectedMapRegion, setSelectedMapRegion] = useState("");
   const [sommelierInput, setSommelierInput] = useState("");
@@ -392,7 +417,6 @@ export default function Home() {
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>(fallbackRates);
   const [exchangeStatus, setExchangeStatus] = useState("Using backup exchange rates.");
   const [profileStatus, setProfileStatus] = useState("");
-  const [scannerTarget, setScannerTarget] = useState<HTMLElement | null>(null);
   const researchedBottle = recognizedBottle ?? researchedWines[Math.max(researchIndex, 0)];
   const tonight = liveTonight ?? {
     label: "",
@@ -403,14 +427,38 @@ export default function Home() {
     ? [...recommendedBottle.service.split("/").map((item) => item.trim()), recommendedBottle.drinkingWindow]
     : ["No bottle", "No service", "No window"];
   const collectionTotal = collectionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+  const typeCount = (type: string) => collectionBottles
+    .filter((bottle) => wineTypeForBottle(bottle) === type)
+    .reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+  const grapeOptions = Array.from(new Set(collectionBottles.flatMap((bottle) =>
+    bottle.grapes
+      .split(/,|\/|\+| and /i)
+      .map((grape) => grape.replace(/\d+%/g, "").trim())
+      .filter(Boolean)
+  ))).sort();
+  const windowOptions = Array.from(new Set(collectionBottles.map((bottle) => bottle.window).filter(Boolean))).sort();
   const visibleBottles = collectionBottles
     .filter((bottle) => collectionRegion === "All regions" || regionLabel(bottle.region) === collectionRegion)
+    .filter((bottle) => collectionType === "All types" || wineTypeForBottle(bottle) === collectionType)
+    .filter((bottle) => collectionGrape === "All grapes" || bottle.grapes.toLowerCase().includes(collectionGrape.toLowerCase()))
+    .filter((bottle) => collectionWindow === "All windows" || bottle.window === collectionWindow)
+    .filter((bottle) => {
+      if (collectionResearch === "All research") return true;
+      if (collectionResearch === "Researched") return Boolean(bottle.research) || !/research/i.test(bottle.priceRange ?? "");
+      return !bottle.research && /research/i.test(bottle.priceRange ?? "");
+    })
     .filter((bottle) => `${bottle.producer} ${bottle.wine} ${bottle.vintage} ${bottle.region} ${bottle.grapes}`.toLowerCase().includes(collectionSearch.toLowerCase()))
     .sort((a, b) => {
       if (collectionSort === "score") return Number(b.score) - Number(a.score);
       if (collectionSort === "vintage") return String(b.vintage).localeCompare(String(a.vintage));
       return a.producer.localeCompare(b.producer);
     });
+  const groupedVisibleBottles = ["Red", "White", "Rosé", "Sparkling", "Orange", "Other"]
+    .map((type) => ({
+      type,
+      bottles: visibleBottles.filter((bottle) => wineTypeForBottle(bottle) === type)
+    }))
+    .filter((group) => group.bottles.length);
   const readyCount = collectionBottles.filter((bottle) => /peak/i.test(bottle.window)).length;
   const mapRegions = useMemo(() => {
     const grouped = new Map<string, CollectionBottle[]>();
@@ -443,8 +491,13 @@ export default function Home() {
   const selectedRegionReadyBottles = selectedRegionBottles.filter((bottle) => /peak/i.test(bottle.window));
 
   useEffect(() => {
-    setScannerTarget(document.getElementById("hero-scanner-slot"));
     if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+    setActiveView(viewFromHash(window.location.hash));
+    const handleHashChange = () => {
+      setActiveView(viewFromHash(window.location.hash));
+      window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+    };
+    window.addEventListener("hashchange", handleHashChange);
     if (!window.location.hash) window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
     try {
       localStorage.removeItem("cellar-removed-bottles");
@@ -479,6 +532,7 @@ export default function Home() {
     } catch {
       setFirstName("");
     }
+    return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
   useEffect(() => {
@@ -846,9 +900,18 @@ export default function Home() {
     setSommelierInput("");
   }
 
+  function navigateToView(view: ViewId) {
+    setActiveView(view);
+    const hash = view === "home" ? "" : `#${view}`;
+    if (window.location.hash !== hash) {
+      window.history.pushState(null, "", hash || window.location.pathname);
+    }
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-cellar-cream text-cellar-ink">
-      <section className="relative isolate min-h-screen px-4 pb-8 pt-4 sm:px-6 lg:px-8">
+      <section className={`relative isolate min-h-screen px-4 pb-8 pt-4 sm:px-6 lg:px-8 ${activeView === "home" ? "" : "hidden"}`}>
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(199,162,90,0.12),transparent_30%),linear-gradient(180deg,#fbf7ed_0%,#f6efe1_100%)]" />
         <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-[linear-gradient(180deg,rgba(59,12,27,0.12),transparent)]" />
 
@@ -860,12 +923,13 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href="#add-bottle" className="hidden items-center gap-2 rounded-md bg-burgundy-700 px-4 py-2 text-sm font-medium text-white shadow-soft transition hover:bg-burgundy-900 sm:inline-flex">
+            <a href="#add-bottle" onClick={(event) => { event.preventDefault(); navigateToView("add-bottle"); }} className="hidden items-center gap-2 rounded-md bg-burgundy-700 px-4 py-2 text-sm font-medium text-white shadow-soft transition hover:bg-burgundy-900 sm:inline-flex">
               <Camera className="size-4" aria-hidden />
               Add Bottle
             </a>
             <a
               href="#add-bottle"
+              onClick={(event) => { event.preventDefault(); navigateToView("add-bottle"); }}
               className="grid size-11 place-items-center rounded-md bg-burgundy-700 text-white shadow-soft transition hover:bg-burgundy-900 sm:hidden"
               aria-label="Identify a new bottle"
               title="Identify a new bottle"
@@ -878,20 +942,27 @@ export default function Home() {
               </summary>
               <nav className="absolute right-0 z-20 mt-3 w-72 rounded-lg border border-white/70 bg-cellar-parchment p-2 shadow-cellar">
                 {[
-                  ["My Bottles", "#my-collection", Grape],
-                  ["Full Collection Overview", "#collection-overview", Wine],
-                  ["Overall Collection", "#dashboard", LayoutDashboard],
-                  ["Regional Map", "#regional-map", MapIcon],
-                  ["AI Sommelier", "#sommelier", MessageCircle],
-                  ["Profile & Settings", "#settings", Settings]
-                ].map(([label, href, Icon]) => {
+                  ["Home", "home", Wine],
+                  ["Add Bottle", "add-bottle", Camera],
+                  ["My Bottles", "my-collection", Grape],
+                  ["Full Collection Overview", "collection-overview", Wine],
+                  ["Overall Collection", "dashboard", LayoutDashboard],
+                  ["Regional Map", "regional-map", MapIcon],
+                  ["AI Sommelier", "sommelier", MessageCircle],
+                  ["Profile & Settings", "settings", Settings]
+                ].map(([label, view, Icon]) => {
                   const NavIcon = Icon as typeof Wine;
+                  const viewId = view as ViewId;
                   return (
                     <a
-                      className="flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium text-cellar-ink transition hover:bg-white"
-                      href={href as string}
+                      className={`flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium text-cellar-ink transition hover:bg-white ${activeView === viewId ? "bg-white" : ""}`}
+                      href={viewId === "home" ? "#" : `#${viewId}`}
                       key={label as string}
-                      onClick={(event) => (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open")}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateToView(viewId);
+                        (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
+                      }}
                     >
                       <NavIcon className="size-4 text-burgundy-700" aria-hidden />
                       {label as string}
@@ -955,7 +1026,6 @@ export default function Home() {
               </div>
             </div>
           </section>
-            <div id="hero-scanner-slot" />
           </div>
 
           <aside className="grid gap-6">
@@ -1026,7 +1096,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section className="rounded-lg bg-burgundy-900 p-5 text-white shadow-cellar" id="sommelier">
+            <section className="rounded-lg bg-burgundy-900 p-5 text-white shadow-cellar">
               <div className="flex items-center gap-3">
                 <MessageCircle className="size-5 text-cellar-gold" aria-hidden />
                 <h2 className="font-serif text-2xl">AI Sommelier</h2>
@@ -1071,14 +1141,14 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8" id="collection-overview">
+      <section className={`min-h-screen bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8 ${activeView === "collection-overview" ? "" : "hidden"}`} id="collection-overview">
         <div className="mx-auto max-w-7xl">
           <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Full collection overview</p>
               <h2 className="mt-2 font-serif text-4xl">Your cellar at a glance</h2>
             </div>
-            <a href="#my-collection" className="inline-flex w-fit items-center gap-2 rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-cellar-cream">
+            <a href="#my-collection" onClick={(event) => { event.preventDefault(); navigateToView("my-collection"); }} className="inline-flex w-fit items-center gap-2 rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-cellar-cream">
               Browse cellar <ChevronRight className="size-4" aria-hidden />
             </a>
           </div>
@@ -1088,9 +1158,9 @@ export default function Home() {
               <div className="grid gap-3 sm:grid-cols-4">
                 {[
                   [String(collectionTotal), "Total bottles"],
-                  ["0", "Red"],
-                  [String(collectionTotal), "White"],
-                  ["0", "Sparkling"]
+                  [String(typeCount("Red")), "Red"],
+                  [String(typeCount("White")), "White"],
+                  [String(typeCount("Sparkling")), "Sparkling"]
                 ].map(([value, label]) => (
                   <div className="rounded-md bg-cellar-parchment p-4" key={label}>
                     <p className="font-serif text-3xl">{value}</p>
@@ -1106,7 +1176,7 @@ export default function Home() {
                       One private cellar for every bottle, vintage, tasting note, and storage detail.
                     </p>
                   </div>
-                  <a href="#settings" className="inline-flex w-fit items-center gap-2 rounded-md border border-cellar-oak/20 px-3 py-2 text-sm font-medium text-burgundy-700">
+                  <a href="#settings" onClick={(event) => { event.preventDefault(); navigateToView("settings"); }} className="inline-flex w-fit items-center gap-2 rounded-md border border-cellar-oak/20 px-3 py-2 text-sm font-medium text-burgundy-700">
                     Rename cellar <Settings className="size-4" aria-hidden />
                   </a>
                 </div>
@@ -1130,9 +1200,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8">
+      <section className={`min-h-screen bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8 ${activeView === "add-bottle" || activeView === "dashboard" ? "" : "hidden"}`}>
         <div className="mx-auto max-w-7xl">
-          {scannerTarget && createPortal(
+          {activeView === "add-bottle" && (
           <Panel title="Bottle Recognition" eyebrow="Add Bottle" icon={<ScanLine className="size-5" />} id="add-bottle">
             <div className="-mt-16 mb-5 flex justify-end">
               <button
@@ -1300,9 +1370,10 @@ export default function Home() {
                 ) : null}
               </div>
             </div>
-          </Panel>,
-          scannerTarget)}
+          </Panel>
+          )}
 
+          {activeView === "dashboard" && (
           <Panel title="Collection Dashboard" eyebrow="Live cellar" icon={<BarChart3 className="size-5" />} id="dashboard">
             <div className="grid gap-3 sm:grid-cols-3">
               {[`${collectionTotal} bottles`, `Ready now ${readyCount}`, `${new Set(collectionBottles.map((bottle) => bottle.region)).size} regions`].map((item) => (
@@ -1323,10 +1394,11 @@ export default function Home() {
               ))}
             </div>
           </Panel>
+          )}
         </div>
       </section>
 
-      <section className="px-4 py-12 sm:px-6 lg:px-8" id="my-collection">
+      <section className={`min-h-screen px-4 py-12 sm:px-6 lg:px-8 ${activeView === "my-collection" ? "" : "hidden"}`} id="my-collection">
         <div className="mx-auto max-w-7xl">
           <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
             <div>
@@ -1334,7 +1406,7 @@ export default function Home() {
               <h2 className="mt-2 font-serif text-4xl">Your complete collection</h2>
               <p className="mt-2 text-cellar-walnut">Detailed cards for every vintage, bottle, and storage location.</p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_160px_150px]">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.2fr)_140px_130px_150px_150px_140px_140px]">
               <label className="flex items-center gap-2 rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2">
                 <Search className="size-4 text-burgundy-700" aria-hidden />
                 <span className="sr-only">Search collection</span>
@@ -1343,6 +1415,23 @@ export default function Home() {
               <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionRegion} onChange={(event) => setCollectionRegion(event.target.value)}>
                 <option>All regions</option>
                 {mapRegions.map(({ region }) => <option key={region}>{region}</option>)}
+              </select>
+              <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionType} onChange={(event) => setCollectionType(event.target.value)}>
+                <option>All types</option>
+                {["Red", "White", "Rosé", "Sparkling", "Orange", "Other"].map((type) => <option key={type}>{type}</option>)}
+              </select>
+              <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionGrape} onChange={(event) => setCollectionGrape(event.target.value)}>
+                <option>All grapes</option>
+                {grapeOptions.map((grape) => <option key={grape}>{grape}</option>)}
+              </select>
+              <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionWindow} onChange={(event) => setCollectionWindow(event.target.value)}>
+                <option>All windows</option>
+                {windowOptions.map((window) => <option key={window}>{window}</option>)}
+              </select>
+              <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionResearch} onChange={(event) => setCollectionResearch(event.target.value)}>
+                <option>All research</option>
+                <option>Researched</option>
+                <option>Needs research</option>
               </select>
               <select className="rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2 text-sm" value={collectionSort} onChange={(event) => setCollectionSort(event.target.value)}>
                 <option value="producer">Producer A-Z</option>
@@ -1353,90 +1442,82 @@ export default function Home() {
           </div>
 
           <p className="mb-4 text-sm font-medium text-cellar-walnut">{visibleBottles.length} collection cards shown</p>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {visibleBottles.map((bottle) => (
-              <article className="group overflow-hidden rounded-lg border border-cellar-oak/15 bg-white shadow-soft transition hover:-translate-y-0.5 hover:shadow-cellar" key={`${bottle.producer}${bottle.vintage}`}>
-                <div className={`relative h-40 bg-gradient-to-br ${bottle.accent} p-5 text-white`}>
-                  <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/45 to-transparent" />
-                  <div className="absolute right-5 top-5 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-cellar-ink">
-                    {bottle.quantity}
+          <div className="space-y-10">
+            {groupedVisibleBottles.map(({ type, bottles }) => (
+              <section className="rounded-lg border border-cellar-oak/15 bg-white/46 p-4 shadow-soft" key={type}>
+                <div className="mb-4 flex items-end justify-between gap-4 border-b border-cellar-oak/15 pb-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">{type} wines</p>
+                    <h3 className="mt-1 font-serif text-3xl">{type} shelf</h3>
                   </div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="relative min-w-0 pr-20">
-                      <p className="truncate text-xs uppercase tracking-[0.16em] text-white/68">{regionLabel(bottle.region)}</p>
-                      <p className="mt-2 font-serif text-5xl leading-none">{bottle.vintage}</p>
-                    </div>
-                    <button
-                      className={`relative grid size-9 place-items-center rounded-md border border-white/25 ${favoriteBottles.includes(bottle.producer) ? "bg-white text-burgundy-700" : "bg-black/15 text-white"}`}
-                      aria-label={`Favorite ${bottle.producer}`}
-                      aria-pressed={favoriteBottles.includes(bottle.producer)}
-                      onClick={() => setFavoriteBottles((current) => current.includes(bottle.producer) ? current.filter((item) => item !== bottle.producer) : [...current, bottle.producer])}
-                    >
-                      <Heart className="size-4" fill={favoriteBottles.includes(bottle.producer) ? "currentColor" : "none"} aria-hidden />
-                    </button>
-                  </div>
-                  <div className="absolute bottom-4 left-5 right-5 flex items-center justify-between gap-3">
-                    <span className="rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-medium text-white">{bottle.style ?? bottle.classification}</span>
-                    <span className="rounded-full bg-cellar-gold px-3 py-1 text-xs font-semibold text-cellar-ink">{bottle.window}</span>
-                  </div>
+                  <span className="rounded-full bg-cellar-parchment px-3 py-1 text-xs font-semibold text-cellar-walnut">{bottles.length} cards</span>
                 </div>
-
-                <div className="p-5">
-                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-burgundy-700">{bottle.producer}</p>
-                  <h3 className="mt-2 min-h-14 font-serif text-2xl leading-7">{bottle.wine}</h3>
-                  <p className="mt-2 text-sm font-medium text-cellar-walnut">{bottle.appellation}</p>
-                  <div className="mt-3 inline-flex rounded-full bg-cellar-parchment px-3 py-1 text-xs font-semibold text-burgundy-900">
-                    Per-bottle price range: {displayPriceRange(bottle.priceRange, currency, exchangeRates)}
-                  </div>
-                  {bottle.tastingNotes?.length ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {bottle.tastingNotes.slice(0, 6).map((note) => (
-                        <span className="rounded-full bg-burgundy-50 px-3 py-1 text-xs font-medium text-burgundy-900" key={note}>{note}</span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm leading-6 text-cellar-walnut">{bottle.note}</p>
-                  )}
-
-                  <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                    {[
-                      ["Grapes", bottle.grapes],
-                      ["Drink", bottle.drinkingWindow],
-                      ["Bottle price range", displayPriceRange(bottle.priceRange, currency, exchangeRates)],
-                      ["Storage", bottle.cellar],
-                      ["Service", bottle.service]
-                    ].map(([label, value]) => (
-                      <div className="rounded-md bg-cellar-parchment p-3" key={label}>
-                        <p className="text-[11px] uppercase tracking-[0.12em] text-cellar-walnut">{label}</p>
-                        <p className="mt-1 line-clamp-2 font-medium">{value}</p>
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {bottles.map((bottle) => (
+                    <article className="group overflow-hidden rounded-lg border border-cellar-oak/15 bg-white shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-cellar" key={`${bottle.producer}${bottle.vintage}`}>
+                      <div className="relative grid min-h-72 grid-cols-[128px_1fr] gap-4 overflow-hidden bg-[linear-gradient(135deg,#fbf7ed,#efe2c9)] p-5">
+                        <div className="absolute inset-0 opacity-0 transition duration-500 group-hover:opacity-100 bg-[radial-gradient(circle_at_25%_10%,rgba(199,162,90,.28),transparent_24%)]" />
+                        <DigitalBottle bottle={bottle} />
+                        <div className="relative min-w-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs uppercase tracking-[0.16em] text-burgundy-700">{regionLabel(bottle.region)}</p>
+                              <h3 className="mt-2 font-serif text-2xl leading-7">{bottle.wine}</h3>
+                            </div>
+                            <button
+                              className={`grid size-9 shrink-0 place-items-center rounded-md border border-cellar-oak/20 ${favoriteBottles.includes(bottle.producer) ? "bg-burgundy-700 text-white" : "bg-white/70 text-burgundy-700"}`}
+                              aria-label={`Favorite ${bottle.producer}`}
+                              aria-pressed={favoriteBottles.includes(bottle.producer)}
+                              onClick={() => setFavoriteBottles((current) => current.includes(bottle.producer) ? current.filter((item) => item !== bottle.producer) : [...current, bottle.producer])}
+                            >
+                              <Heart className="size-4" fill={favoriteBottles.includes(bottle.producer) ? "currentColor" : "none"} aria-hidden />
+                            </button>
+                          </div>
+                          <p className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-cellar-walnut">{bottle.producer}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-burgundy-50 px-3 py-1 text-xs font-semibold text-burgundy-900">{wineTypeForBottle(bottle)}</span>
+                            <span className="rounded-full bg-cellar-parchment px-3 py-1 text-xs font-semibold text-cellar-walnut">{bottle.window}</span>
+                            <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-cellar-walnut">{bottle.quantity}</span>
+                          </div>
+                          <p className="mt-4 line-clamp-2 text-sm leading-6 text-cellar-walnut">{bottle.appellation} / {bottle.grapes}</p>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {(bottle.tastingNotes?.length ? bottle.tastingNotes.slice(0, 5) : [bottle.style ?? bottle.classification]).map((note) => (
+                              <span className="rounded-full border border-cellar-oak/15 bg-white/70 px-2.5 py-1 text-xs font-medium text-cellar-ink" key={note}>{note}</span>
+                            ))}
+                          </div>
+                          <div className="mt-5 rounded-md bg-white/70 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.12em] text-cellar-walnut">Per-bottle price range</p>
+                            <p className="mt-1 font-medium">{displayPriceRange(bottle.priceRange, currency, exchangeRates)}</p>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-cellar-oak/15 pt-4">
-                    <p className="text-xs leading-5 text-cellar-walnut">Added to {bottle.cellar}<br />Per bottle: {displayPriceRange(bottle.priceRange, currency, exchangeRates)}</p>
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        className="rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-white"
-                        onClick={() => void openBottleDetails(bottle)}
-                      >
-                        Full details
-                      </button>
-                      <button
-                        className="grid size-10 place-items-center rounded-md border border-burgundy-700/25 text-burgundy-700 transition hover:bg-burgundy-700 hover:text-white"
-                        aria-label={`Delete ${bottle.vintage} ${bottle.producer}`}
-                        onClick={() => showDialog(
-                          `Remove ${bottle.vintage} ${bottle.producer}?`,
-                          `This will remove ${bottle.quantity} of ${bottle.wine} from your collection. This action cannot be undone.`,
-                          "Delete bottles",
-                          () => deleteBottle(`${bottle.producer}-${bottle.vintage}`)
-                        )}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </button>
-                    </div>
-                  </div>
+                      <div className="flex items-center justify-between gap-3 border-t border-cellar-oak/15 p-4">
+                        <p className="text-xs leading-5 text-cellar-walnut">Stored in {bottle.cellar}<br />Drink {bottle.drinkingWindow}</p>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            className="rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-white"
+                            onClick={() => void openBottleDetails(bottle)}
+                          >
+                            Full details
+                          </button>
+                          <button
+                            className="grid size-10 place-items-center rounded-md border border-burgundy-700/25 text-burgundy-700 transition hover:bg-burgundy-700 hover:text-white"
+                            aria-label={`Delete ${bottle.vintage} ${bottle.producer}`}
+                            onClick={() => showDialog(
+                              `Remove ${bottle.vintage} ${bottle.producer}?`,
+                              `This will remove ${bottle.quantity} of ${bottle.wine} from your collection. This action cannot be undone.`,
+                              "Delete bottles",
+                              () => deleteBottle(`${bottle.producer}-${bottle.vintage}`)
+                            )}
+                          >
+                            <Trash2 className="size-4" aria-hidden />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </article>
+              </section>
             ))}
           </div>
           {visibleBottles.length === 0 && (
@@ -1447,7 +1528,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="bg-cellar-night px-4 py-10 text-cellar-cream sm:px-6 lg:px-8">
+      <section className={`min-h-screen bg-cellar-night px-4 py-10 text-cellar-cream sm:px-6 lg:px-8 ${activeView === "regional-map" ? "" : "hidden"}`}>
         <div className="mx-auto max-w-7xl">
           <Panel dark title="Regional Map" eyebrow="Collection geography" icon={<MapIcon className="size-5" />} id="regional-map">
             <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
@@ -1513,7 +1594,7 @@ export default function Home() {
                     disabled={!activeMapRegion}
                     onClick={() => {
                       setCollectionRegion(activeMapRegion);
-                      document.getElementById("my-collection")?.scrollIntoView({ behavior: "smooth" });
+                      navigateToView("my-collection");
                     }}
                   >
                     <Search className="size-4" aria-hidden />
@@ -1539,7 +1620,7 @@ export default function Home() {
               className="mt-4 inline-flex items-center gap-2 rounded-md border border-cellar-gold/25 px-4 py-2 text-sm font-medium text-cellar-cream hover:bg-white/10"
               onClick={() => {
                 setCollectionRegion("All regions");
-                document.getElementById("my-collection")?.scrollIntoView({ behavior: "smooth" });
+                navigateToView("my-collection");
               }}
             >
               View all regions <ChevronRight className="size-4" aria-hidden />
@@ -1548,7 +1629,56 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-t border-cellar-oak/20 bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8" id="settings">
+      <section className={`min-h-screen bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8 ${activeView === "sommelier" ? "" : "hidden"}`} id="sommelier-page">
+        <div className="mx-auto max-w-4xl">
+          <section className="rounded-lg bg-burgundy-900 p-5 text-white shadow-cellar sm:p-7" id="sommelier">
+            <div className="flex items-center gap-3">
+              <MessageCircle className="size-5 text-cellar-gold" aria-hidden />
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-cellar-gold">AI Sommelier</p>
+                <h2 className="mt-2 font-serif text-4xl">Ask about your cellar</h2>
+              </div>
+            </div>
+            <div className="mt-6 flex min-h-[420px] max-h-[60vh] flex-col gap-2 overflow-y-auto rounded-md bg-black/15 p-3" aria-live="polite">
+              {sommelierMessages.map((message, index) => (
+                <div
+                  className={`max-w-[88%] rounded-md px-3 py-2 text-sm leading-6 ${message.role === "user" ? "self-end bg-white text-burgundy-900" : "self-start bg-white/10 text-cellar-cream"}`}
+                  key={`${message.role}-${index}`}
+                >
+                  {message.text}
+                </div>
+              ))}
+            </div>
+            <form
+              className="mt-3 grid grid-cols-[1fr_auto] gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                sendSommelierMessage();
+              }}
+            >
+              <input
+                className="min-w-0 rounded-md border-0 bg-white px-3 py-3 text-sm text-cellar-ink outline-none"
+                value={sommelierInput}
+                onChange={(event) => setSommelierInput(event.target.value)}
+                placeholder="Ask the sommelier"
+                aria-label="Message the AI Sommelier"
+              />
+              <button className="grid size-11 place-items-center rounded-md bg-cellar-gold text-cellar-ink" aria-label="Send message" type="submit">
+                <Send className="size-4" aria-hidden />
+              </button>
+            </form>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {["What pairs with duck?", "What should I open tonight?", "Which wines should I keep aging?"].map((prompt) => (
+                <button className="rounded-full border border-white/20 px-3 py-2 text-xs text-cellar-cream" key={prompt} onClick={() => sendSommelierMessage(prompt)}>
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section className={`min-h-screen border-t border-cellar-oak/20 bg-cellar-parchment px-4 py-10 sm:px-6 lg:px-8 ${activeView === "settings" ? "" : "hidden"}`} id="settings">
         <div className="mx-auto max-w-7xl">
           <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Profile & Settings</p>
           <h2 className="mt-2 font-serif text-4xl">Your Cellar profile</h2>
@@ -1808,6 +1938,41 @@ function Panel({
       </div>
       {children}
     </section>
+  );
+}
+
+function DigitalBottle({ bottle }: { bottle: CollectionBottle }) {
+  const type = wineTypeForBottle(bottle);
+  const glassClass = type === "White" || type === "Rosé" || type === "Sparkling"
+    ? "from-[#e6d79d] via-[#6d7957] to-[#17231d]"
+    : "from-[#271315] via-[#101010] to-[#050505]";
+  const labelTint = type === "Red"
+    ? "border-burgundy-900/20 bg-[#f7efe4]"
+    : type === "White"
+      ? "border-cellar-gold/35 bg-[#fffaf0]"
+      : type === "Rosé"
+        ? "border-rose-200 bg-[#fff1f3]"
+        : "border-cellar-gold/40 bg-white";
+
+  return (
+    <div className="relative grid place-items-center">
+      <div className="absolute bottom-1 h-5 w-24 rounded-full bg-black/20 blur-md transition duration-500 group-hover:scale-110" />
+      <div className="relative h-64 w-24 origin-bottom transition duration-500 group-hover:-translate-y-2 group-hover:rotate-[-2deg]">
+        <div className={`absolute left-1/2 top-0 h-12 w-8 -translate-x-1/2 rounded-t-full bg-gradient-to-r ${glassClass} shadow-inner`} />
+        <div className={`absolute left-1/2 top-9 h-7 w-12 -translate-x-1/2 rounded-t-xl bg-gradient-to-r ${glassClass}`} />
+        <div className={`absolute bottom-0 left-1/2 h-52 w-24 -translate-x-1/2 overflow-hidden rounded-t-[2rem] rounded-b-xl bg-gradient-to-r ${glassClass} shadow-[inset_12px_0_18px_rgba(255,255,255,.11),inset_-14px_0_20px_rgba(0,0,0,.42),0_18px_28px_rgba(32,23,21,.24)]`}>
+          <div className="absolute left-4 top-4 h-44 w-3 rounded-full bg-white/18 blur-sm transition duration-500 group-hover:translate-x-1" />
+          <div className={`absolute left-2 right-2 top-20 rounded-md border px-2 py-3 text-center shadow-soft ${labelTint}`}>
+            <p className="truncate text-[9px] uppercase tracking-[0.16em] text-burgundy-900">{bottle.producer}</p>
+            <p className="mt-1 font-serif text-lg leading-none text-cellar-ink">{bottle.vintage}</p>
+            <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-3 text-cellar-ink">{bottle.wine}</p>
+            <p className="mt-2 truncate text-[8px] uppercase tracking-[0.12em] text-cellar-walnut">{bottle.appellation}</p>
+            <p className="mt-1 text-[8px] font-semibold text-burgundy-700">{type}</p>
+          </div>
+          <div className="absolute inset-0 translate-x-[-120%] bg-gradient-to-r from-transparent via-white/18 to-transparent transition duration-700 group-hover:translate-x-[120%]" />
+        </div>
+      </div>
+    </div>
   );
 }
 

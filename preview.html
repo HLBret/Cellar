@@ -25,6 +25,7 @@
       }
 
       * { box-sizing: border-box; }
+      .page-hidden { display: none !important; }
       body {
         margin: 0;
         color: var(--ink);
@@ -397,7 +398,7 @@
       .collection-subtitle { margin: 8px 0 0; color: var(--oak); }
       .collection-tools {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) 150px 150px;
+        grid-template-columns: minmax(220px, 1.2fr) repeat(6, minmax(130px, .7fr));
         gap: 8px;
       }
       .collection-tools input, .collection-tools select {
@@ -426,6 +427,65 @@
         transition: transform .18s ease, box-shadow .18s ease;
       }
       .wine-card:hover { transform: translateY(-2px); box-shadow: 0 24px 70px rgba(32,23,21,.18); }
+      .wine-shelf {
+        grid-column: 1 / -1;
+        border: 1px solid rgba(142,96,72,.16);
+        border-radius: 8px;
+        background: rgba(255,255,255,.46);
+        padding: 16px;
+        box-shadow: 0 12px 36px rgba(63,41,35,.1);
+      }
+      .wine-shelf-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid rgba(142,96,72,.16);
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+      }
+      .wine-shelf-head h3 { margin: 4px 0 0; font: 500 30px Georgia, serif; }
+      .wine-shelf-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+      .premium-card-main {
+        position: relative;
+        display: grid;
+        grid-template-columns: 128px 1fr;
+        gap: 16px;
+        min-height: 288px;
+        overflow: hidden;
+        background: linear-gradient(135deg,#fbf7ed,#efe2c9);
+        padding: 18px;
+      }
+      .premium-card-main:before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 25% 10%, rgba(199,162,90,.28), transparent 24%);
+        opacity: 0;
+        transition: opacity .45s ease;
+      }
+      .wine-card:hover .premium-card-main:before { opacity: 1; }
+      .digital-bottle-wrap { position: relative; display: grid; place-items: center; }
+      .digital-shadow { position: absolute; bottom: 5px; width: 96px; height: 20px; border-radius: 999px; background: rgba(0,0,0,.2); filter: blur(8px); transition: transform .45s ease; }
+      .wine-card:hover .digital-shadow { transform: scale(1.1); }
+      .digital-bottle { position: relative; width: 96px; height: 256px; transform-origin: bottom; transition: transform .45s ease; }
+      .wine-card:hover .digital-bottle { transform: translateY(-8px) rotate(-2deg); }
+      .digital-neck { position: absolute; left: 50%; top: 0; width: 32px; height: 48px; transform: translateX(-50%); border-radius: 999px 999px 0 0; background: linear-gradient(90deg,#271315,#101010,#050505); }
+      .digital-shoulder { position: absolute; left: 50%; top: 36px; width: 48px; height: 32px; transform: translateX(-50%); border-radius: 16px 16px 0 0; background: linear-gradient(90deg,#271315,#101010,#050505); }
+      .digital-body { position: absolute; left: 50%; bottom: 0; width: 96px; height: 210px; transform: translateX(-50%); overflow: hidden; border-radius: 34px 34px 12px 12px; background: linear-gradient(90deg,#271315,#101010,#050505); box-shadow: inset 12px 0 18px rgba(255,255,255,.11), inset -14px 0 20px rgba(0,0,0,.42), 0 18px 28px rgba(32,23,21,.24); }
+      .digital-bottle.light .digital-neck,
+      .digital-bottle.light .digital-shoulder,
+      .digital-bottle.light .digital-body { background: linear-gradient(90deg,#e6d79d,#6d7957,#17231d); }
+      .digital-highlight { position: absolute; left: 16px; top: 16px; width: 12px; height: 176px; border-radius: 999px; background: rgba(255,255,255,.18); filter: blur(4px); transition: transform .45s ease; }
+      .wine-card:hover .digital-highlight { transform: translateX(4px); }
+      .digital-label { position: absolute; left: 8px; right: 8px; top: 80px; border: 1px solid rgba(59,12,27,.18); border-radius: 6px; background: #f7efe4; padding: 12px 8px; text-align: center; box-shadow: 0 12px 36px rgba(63,41,35,.12); }
+      .digital-label small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--burgundy); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; }
+      .digital-label strong { display: block; margin-top: 4px; font: 500 18px Georgia, serif; }
+      .digital-label b { display: block; margin-top: 4px; color: var(--ink); font-size: 10px; line-height: 1.2; }
+      .digital-label em { display: block; margin-top: 8px; color: var(--oak); font-size: 8px; font-style: normal; letter-spacing: .1em; text-transform: uppercase; }
+      .digital-shine { position: absolute; inset: 0; transform: translateX(-120%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent); transition: transform .7s ease; }
+      .wine-card:hover .digital-shine { transform: translateX(120%); }
+      .premium-card-copy { position: relative; min-width: 0; }
       .wine-card-cover {
         position: relative;
         height: 160px;
@@ -966,6 +1026,7 @@
         .collection-head { align-items: start; flex-direction: column; }
         .collection-tools { width: 100%; }
         .collection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .wine-shelf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .bottle, .shelves { display: none; }
         .hero { min-height: 650px; }
         .stats, .overview-stats { grid-template-columns: repeat(2, 1fr); }
@@ -981,7 +1042,7 @@
         .stats { left: 22px; right: 22px; bottom: 22px; }
         .recognition, .capture-grid { grid-template-columns: 1fr; }
         .overview-head { align-items: start; flex-direction: column; }
-        .collection-tools, .collection-grid { grid-template-columns: 1fr; }
+        .collection-tools, .collection-grid, .wine-shelf-grid, .premium-card-main { grid-template-columns: 1fr; }
         .profile-form { grid-template-columns: 1fr; }
       }
     </style>
@@ -998,6 +1059,8 @@
           <details class="menu">
             <summary aria-label="Open menu"><span></span></summary>
             <nav>
+              <a href="#">Home</a>
+              <a href="#add-bottle">Add Bottle</a>
               <a href="#my-collection">My Bottles</a>
               <a href="#collection-overview">Full Collection Overview</a>
               <a href="#dashboard">Overall Collection</a>
@@ -1193,6 +1256,26 @@
               <option>Piedmont</option>
               <option>Santa Cruz</option>
             </select>
+            <select id="collection-type" aria-label="Filter by wine type">
+              <option>All types</option>
+              <option>Red</option>
+              <option>White</option>
+              <option>Rosé</option>
+              <option>Sparkling</option>
+              <option>Orange</option>
+              <option>Other</option>
+            </select>
+            <select id="collection-grape" aria-label="Filter by grape">
+              <option>All grapes</option>
+            </select>
+            <select id="collection-window" aria-label="Filter by drinking window">
+              <option>All windows</option>
+            </select>
+            <select id="collection-research" aria-label="Filter by research status">
+              <option>All research</option>
+              <option>Researched</option>
+              <option>Needs research</option>
+            </select>
             <select id="collection-sort" aria-label="Sort collection">
               <option value="producer">Producer A-Z</option>
               <option value="score">Highest score</option>
@@ -1235,7 +1318,6 @@
     <script>
       if ("scrollRestoration" in history) history.scrollRestoration = "manual";
       if (!window.location.hash) requestAnimationFrame(() => window.scrollTo(0, 0));
-      document.querySelector(".hero-column").appendChild(document.getElementById("add-bottle"));
       const dropzone = document.getElementById("bottle-dropzone");
       const uploadInput = document.getElementById("bottle-upload");
       const cameraInput = document.getElementById("bottle-camera");
@@ -1261,6 +1343,45 @@
         if (Array.isArray(savedChecks)) checkedBottles = savedChecks;
       } catch (error) {
         checkedBottles = [];
+      }
+
+      const homePage = document.querySelector(".grid");
+      const overviewPage = document.getElementById("collection-overview");
+      const widePage = document.getElementById("dashboard");
+      const addBottlePage = document.getElementById("add-bottle");
+      const mapPage = document.getElementById("regional-map");
+      const collectionPage = document.getElementById("my-collection");
+      const settingsPage = document.getElementById("settings");
+
+      function activePreviewView() {
+        const hash = window.location.hash.replace("#", "");
+        return ["add-bottle", "collection-overview", "dashboard", "my-collection", "regional-map", "sommelier", "settings"].includes(hash)
+          ? hash
+          : "home";
+      }
+
+      function setPreviewView(view) {
+        [homePage, overviewPage, widePage, collectionPage, settingsPage].forEach((page) => page?.classList.add("page-hidden"));
+        [addBottlePage, mapPage].forEach((page) => page?.classList.add("page-hidden"));
+        if (view === "home" || view === "sommelier") homePage?.classList.remove("page-hidden");
+        if (view === "collection-overview" || view === "dashboard") overviewPage?.classList.remove("page-hidden");
+        if (view === "my-collection") collectionPage?.classList.remove("page-hidden");
+        if (view === "settings") settingsPage?.classList.remove("page-hidden");
+        if (view === "add-bottle") {
+          widePage?.classList.remove("page-hidden");
+          addBottlePage?.classList.remove("page-hidden");
+        }
+        if (view === "regional-map") {
+          widePage?.classList.remove("page-hidden");
+          mapPage?.classList.remove("page-hidden");
+        }
+        window.scrollTo(0, 0);
+      }
+
+      function navigatePreview(view) {
+        const hash = view === "home" ? "" : `#${view}`;
+        history.pushState(null, "", hash || window.location.pathname);
+        setPreviewView(view);
       }
       const researchedWines = [
         {
@@ -1509,6 +1630,8 @@
       });
       renderRecognition();
       renderCheckedHistory();
+      setPreviewView(activePreviewView());
+      window.addEventListener("hashchange", () => setPreviewView(activePreviewView()));
 
       const locationQuery = document.getElementById("location-query");
       const searchLocationButton = document.getElementById("search-location");
@@ -1637,6 +1760,10 @@
       }
       const collectionSearch = document.getElementById("collection-search");
       const collectionRegion = document.getElementById("collection-region");
+      const collectionType = document.getElementById("collection-type");
+      const collectionGrape = document.getElementById("collection-grape");
+      const collectionWindow = document.getElementById("collection-window");
+      const collectionResearch = document.getElementById("collection-research");
       const collectionSort = document.getElementById("collection-sort");
       const collectionGrid = document.getElementById("collection-grid");
       const collectionCount = document.getElementById("collection-count");
@@ -1657,11 +1784,31 @@
         return known || String(region || "Unknown region").split(",")[0].trim() || "Unknown region";
       }
 
+      function wineTypeForBottle(wine) {
+        const text = `${wine.style || ""} ${wine.classification || ""} ${wine.wine || ""} ${wine.grapes || ""} ${wine.appellation || ""}`.toLowerCase();
+        if (/sparkling|champagne|prosecco|cava|franciacorta|pet[- ]?nat|crémant|cremant/.test(text)) return "Sparkling";
+        if (/rosé|rose wine|rosado|rosato/.test(text)) return "Rosé";
+        if (/orange wine|skin contact|amber wine/.test(text)) return "Orange";
+        const whiteMatches = (text.match(/white|blanc|bianco|blanco|chardonnay|riesling|sauvignon blanc|chenin blanc|pinot grigio|pinot gris|albariño|albarino|viura|macabeo|verdejo|semillon|sémillon|gewürztraminer|gewurztraminer|grüner|gruner/g) || []).length;
+        const redMatches = (text.match(/red|rouge|rosso|tinto|cabernet|merlot|pinot noir|nebbiolo|syrah|shiraz|grenache|garnacha|sangiovese|tempranillo|malbec|zinfandel|mourvèdre|mourvedre|gamay/g) || []).length;
+        if (redMatches > whiteMatches) return "Red";
+        if (whiteMatches > redMatches) return "White";
+        return "Other";
+      }
+
       function updateCollectionRegionOptions() {
         const current = collectionRegion.value;
         const regions = [...new Set(collectionBottles.map((wine) => regionLabel(wine.region)))];
         collectionRegion.innerHTML = `<option>All regions</option>${regions.map((region) => `<option>${region}</option>`).join("")}`;
         collectionRegion.value = current === "All regions" || regions.includes(current) ? current : "All regions";
+        const currentGrape = collectionGrape.value;
+        const grapes = [...new Set(collectionBottles.flatMap((wine) => wine.grapes.split(/,|\/|\+| and /i).map((grape) => grape.replace(/\d+%/g, "").trim()).filter(Boolean)))].sort();
+        collectionGrape.innerHTML = `<option>All grapes</option>${grapes.map((grape) => `<option>${grape}</option>`).join("")}`;
+        collectionGrape.value = currentGrape === "All grapes" || grapes.includes(currentGrape) ? currentGrape : "All grapes";
+        const currentWindow = collectionWindow.value;
+        const windows = [...new Set(collectionBottles.map((wine) => wine.maturity || wine.window).filter(Boolean))].sort();
+        collectionWindow.innerHTML = `<option>All windows</option>${windows.map((window) => `<option>${window}</option>`).join("")}`;
+        collectionWindow.value = currentWindow === "All windows" || windows.includes(currentWindow) ? currentWindow : "All windows";
       }
 
       function addBottleToCollection(wine) {
@@ -1694,7 +1841,9 @@
         document.getElementById("stat-resting").textContent = Math.max(collectionTotal - ready, 0);
         document.getElementById("stat-regions").textContent = regions.size;
         document.getElementById("overview-total").textContent = collectionTotal;
-        document.getElementById("overview-white").textContent = collectionTotal;
+        document.getElementById("overview-red").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "Red").reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+        document.getElementById("overview-white").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "White").reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+        document.getElementById("overview-sparkling").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "Sparkling").reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
         document.getElementById("overview-cellar-bottles").textContent = collectionTotal;
         showProfile(activeTonightProfile);
         updateCollectionRegionOptions();
@@ -1704,9 +1853,17 @@
       function renderCollection() {
         const query = collectionSearch.value.trim().toLowerCase();
         const region = collectionRegion.value;
+        const type = collectionType.value;
+        const grape = collectionGrape.value;
+        const windowValue = collectionWindow.value;
+        const research = collectionResearch.value;
         const sort = collectionSort.value;
         const visible = collectionBottles
           .filter((wine) => region === "All regions" || regionLabel(wine.region) === region)
+          .filter((wine) => type === "All types" || wineTypeForBottle(wine) === type)
+          .filter((wine) => grape === "All grapes" || wine.grapes.toLowerCase().includes(grape.toLowerCase()))
+          .filter((wine) => windowValue === "All windows" || (wine.maturity || wine.window) === windowValue)
+          .filter((wine) => research === "All research" || (research === "Researched" ? !/research/i.test(wine.priceRange || wine.market || "") : /research/i.test(wine.priceRange || wine.market || "")))
           .filter((wine) => `${wine.producer} ${wine.wine} ${wine.vintage} ${wine.region} ${wine.grapes}`.toLowerCase().includes(query))
           .sort((a, b) => sort === "score" ? b.score - a.score : sort === "vintage" ? String(b.vintage).localeCompare(String(a.vintage)) : a.producer.localeCompare(b.producer));
 
@@ -1715,38 +1872,58 @@
           collectionGrid.innerHTML = `<div class="collection-empty">${collectionBottles.length ? "No bottles match those filters." : "Your cellar is empty. Add a bottle photo to begin your collection."}</div>`;
           return;
         }
-        collectionGrid.innerHTML = visible.map((wine) => `
-          <article class="wine-card">
-            <div class="wine-card-cover" style="background:${wine.color}">
-              <span>${regionLabel(wine.region)}</span>
-              <strong>${wine.vintage}</strong>
-              <b class="wine-card-score">${wine.quantity}</b>
-              <div class="wine-card-status"><b>${wine.classification}</b><em>${wine.maturity}</em></div>
+        const grouped = ["Red", "White", "Rosé", "Sparkling", "Orange", "Other"]
+          .map((groupType) => ({ type: groupType, bottles: visible.filter((wine) => wineTypeForBottle(wine) === groupType) }))
+          .filter((group) => group.bottles.length);
+        collectionGrid.innerHTML = grouped.map((group) => `
+          <section class="wine-shelf">
+            <div class="wine-shelf-head">
+              <div><p class="eyebrow">${group.type} wines</p><h3>${group.type} shelf</h3></div>
+              <span class="scan-count">${group.bottles.length} cards</span>
             </div>
-            <div class="wine-card-body">
-              <div class="wine-card-producer">${wine.producer}</div>
-              <h3>${wine.wine}</h3>
-              <p class="wine-card-meta">${wine.appellation}</p>
-              <div class="wine-price-pill">Per-bottle price range: ${displayPriceRange(wine.priceRange || wine.market)}</div>
-              ${(wine.tastingNotes || []).length
-                ? `<div class="wine-note-pills">${wine.tastingNotes.slice(0, 6).map((note) => `<span>${note}</span>`).join("")}</div>`
-                : `<p class="wine-card-note">${wine.note}</p>`}
-              <div class="wine-details">
-                <div><small>Grapes</small><b>${wine.grapes}</b></div>
-                <div><small>Drink</small><b>${wine.window}</b></div>
-                <div><small>Bottle price range</small><b>${displayPriceRange(wine.priceRange || wine.market)}</b></div>
-                <div><small>Storage</small><b>${wine.storage}</b></div>
-                <div><small>Service</small><b>${wine.service}</b></div>
-              </div>
-              <div class="wine-card-foot">
-                <p>Added to ${wine.storage}<br>Per bottle: ${displayPriceRange(wine.priceRange || wine.market)}</p>
-                <div class="wine-card-actions">
-                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Per-bottle price range ${displayPriceRange(wine.priceRange || wine.market)}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
-                  <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
+            <div class="wine-shelf-grid">
+            ${group.bottles.map((wine) => `
+          <article class="wine-card">
+            <div class="premium-card-main">
+              <div class="digital-bottle-wrap">
+                <div class="digital-shadow"></div>
+                <div class="digital-bottle ${["White", "Rosé", "Sparkling"].includes(wineTypeForBottle(wine)) ? "light" : ""}">
+                  <div class="digital-neck"></div>
+                  <div class="digital-shoulder"></div>
+                  <div class="digital-body">
+                    <div class="digital-highlight"></div>
+                    <div class="digital-label">
+                      <small>${wine.producer}</small>
+                      <strong>${wine.vintage}</strong>
+                      <b>${wine.wine}</b>
+                      <em>${wine.appellation}</em>
+                      <small>${wineTypeForBottle(wine)}</small>
+                    </div>
+                    <div class="digital-shine"></div>
+                  </div>
                 </div>
               </div>
+              <div class="premium-card-copy">
+                <div class="wine-card-producer">${wine.producer}</div>
+                <h3>${wine.wine}</h3>
+                <p class="wine-card-meta">${regionLabel(wine.region)} / ${wine.grapes}</p>
+                <div class="wine-note-pills"><span>${wineTypeForBottle(wine)}</span><span>${wine.maturity}</span><span>${wine.quantity}</span></div>
+                <p class="wine-card-note">${wine.appellation}</p>
+                <div class="wine-price-pill">Per-bottle price range: ${displayPriceRange(wine.priceRange || wine.market)}</div>
+                <div class="wine-note-pills">${(wine.tastingNotes || [wine.classification]).slice(0, 5).map((note) => `<span>${note}</span>`).join("")}</div>
+              </div>
             </div>
+            <div class="wine-card-foot">
+              <p>Stored in ${wine.storage}<br>Drink ${wine.window}</p>
+              <div class="wine-card-actions">
+                <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Per-bottle price range ${displayPriceRange(wine.priceRange || wine.market)}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
+                <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
+                </div>
+              </div>
           </article>
+            `).join("")}
+            </div>
+          </section>
         `).join("");
         collectionGrid.querySelectorAll("[data-action]").forEach((control) => {
           control.addEventListener("click", () => openActionModal(control.dataset.action, control.dataset.copy));
@@ -1759,6 +1936,10 @@
 
       collectionSearch.addEventListener("input", renderCollection);
       collectionRegion.addEventListener("change", renderCollection);
+      collectionType.addEventListener("change", renderCollection);
+      collectionGrape.addEventListener("change", renderCollection);
+      collectionWindow.addEventListener("change", renderCollection);
+      collectionResearch.addEventListener("change", renderCollection);
       collectionSort.addEventListener("change", renderCollection);
 
       const sommelierMessages = document.getElementById("sommelier-messages");
@@ -1912,7 +2093,7 @@
         if (!selectedMapRegion) return;
         collectionRegion.value = selectedMapRegion;
         renderCollection();
-        document.getElementById("my-collection").scrollIntoView({ behavior: "smooth" });
+        navigatePreview("my-collection");
       });
       readyRegionBottles.addEventListener("click", () => {
         if (!selectedMapRegion) return;
@@ -2054,7 +2235,19 @@
         if (event.key === "Escape" && actionModal.classList.contains("open")) closeActionModal();
       });
       document.querySelectorAll(".menu a").forEach((link) => {
-        link.addEventListener("click", () => link.closest("details").removeAttribute("open"));
+        link.addEventListener("click", (event) => {
+          event.preventDefault();
+          navigatePreview(link.getAttribute("href") === "#" ? "home" : link.getAttribute("href").replace("#", ""));
+          link.closest("details").removeAttribute("open");
+        });
+      });
+      document.querySelectorAll(".add,.mobile-add,.browse").forEach((link) => {
+        link.addEventListener("click", (event) => {
+          const href = link.getAttribute("href");
+          if (!href || !href.startsWith("#")) return;
+          event.preventDefault();
+          navigatePreview(href === "#" ? "home" : href.replace("#", ""));
+        });
       });
     </script>
   </body>
