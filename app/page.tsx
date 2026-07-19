@@ -96,6 +96,10 @@ type CollectionBottle = {
   scannedAt?: string;
 };
 
+type CurrencyCode = "GBP" | "USD" | "EUR";
+
+type ExchangeRates = Record<CurrencyCode, number>;
+
 const researchedWines: CollectionBottle[] = [
   {
     producer: "Domaine Leflaive", wine: "Puligny-Montrachet 1er Cru Les Pucelles", vintage: "2020",
@@ -200,6 +204,24 @@ const weatherDescriptions: Record<number, string> = {
   95: "thunderstorms"
 };
 
+const fallbackRates: ExchangeRates = {
+  GBP: 1,
+  USD: 1.29,
+  EUR: 1.16
+};
+
+const currencyLabels: Record<CurrencyCode, string> = {
+  GBP: "GBP (£)",
+  USD: "USD ($)",
+  EUR: "Euro (€)"
+};
+
+const currencySymbols: Record<CurrencyCode, string> = {
+  GBP: "£",
+  USD: "$",
+  EUR: "€"
+};
+
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -301,6 +323,40 @@ function mapPositionForRegion(region: string, index: number) {
   };
 }
 
+function sourceCurrencyForRange(range: string): CurrencyCode {
+  if (range.includes("$")) return "USD";
+  if (range.includes("€")) return "EUR";
+  return "GBP";
+}
+
+function amountToGbp(amount: number, sourceCurrency: CurrencyCode, rates: ExchangeRates) {
+  if (sourceCurrency === "GBP") return amount;
+  return amount / rates[sourceCurrency];
+}
+
+function formatCurrencyAmount(amount: number, currency: CurrencyCode) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: amount >= 100 ? 0 : 2
+  }).format(amount);
+}
+
+function displayPriceRange(priceRange: string | undefined, currency: CurrencyCode, rates: ExchangeRates) {
+  if (!priceRange || /research|pending|not enough|not publicly/i.test(priceRange)) {
+    return priceRange || "Research after opening details";
+  }
+  const matches = [...priceRange.matchAll(/([\d,]+(?:\.\d+)?)/g)]
+    .map((match) => Number(match[1].replace(/,/g, "")))
+    .filter((amount) => Number.isFinite(amount));
+  if (!matches.length) return priceRange;
+  const sourceCurrency = sourceCurrencyForRange(priceRange);
+  const converted = matches.slice(0, 2).map((amount) => amountToGbp(amount, sourceCurrency, rates) * rates[currency]);
+  const suffix = priceRange.match(/per .*/i)?.[0] ?? "per 750 ml bottle";
+  if (converted.length === 1) return `${formatCurrencyAmount(converted[0], currency)} ${suffix}`;
+  return `${formatCurrencyAmount(Math.min(...converted), currency)}-${formatCurrencyAmount(Math.max(...converted), currency)} ${suffix}`;
+}
+
 export default function Home() {
   const [liveTonight, setLiveTonight] = useState<TonightProfile | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
@@ -331,6 +387,10 @@ export default function Home() {
   const [profileFirstName, setProfileFirstName] = useState("");
   const [cellarName, setCellarName] = useState("My Cellar");
   const [profileCellarName, setProfileCellarName] = useState("My Cellar");
+  const [currency, setCurrency] = useState<CurrencyCode>("GBP");
+  const [profileCurrency, setProfileCurrency] = useState<CurrencyCode>("GBP");
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>(fallbackRates);
+  const [exchangeStatus, setExchangeStatus] = useState("Using backup exchange rates.");
   const [profileStatus, setProfileStatus] = useState("");
   const [scannerTarget, setScannerTarget] = useState<HTMLElement | null>(null);
   const researchedBottle = recognizedBottle ?? researchedWines[Math.max(researchIndex, 0)];
@@ -411,9 +471,35 @@ export default function Home() {
         setCellarName(savedCellarName);
         setProfileCellarName(savedCellarName);
       }
+      const savedCurrency = localStorage.getItem("cellar-profile-currency") as CurrencyCode | null;
+      if (savedCurrency && savedCurrency in currencyLabels) {
+        setCurrency(savedCurrency);
+        setProfileCurrency(savedCurrency);
+      }
     } catch {
       setFirstName("");
     }
+  }, []);
+
+  useEffect(() => {
+    async function loadExchangeRates() {
+      try {
+        const response = await fetch("https://api.frankfurter.app/latest?from=GBP&to=USD,EUR");
+        if (!response.ok) throw new Error("Exchange rates unavailable");
+        const data = await response.json() as { rates?: { USD?: number; EUR?: number }; date?: string };
+        const nextRates = {
+          GBP: 1,
+          USD: data.rates?.USD ?? fallbackRates.USD,
+          EUR: data.rates?.EUR ?? fallbackRates.EUR
+        };
+        setExchangeRates(nextRates);
+        setExchangeStatus(`Live exchange rates loaded${data.date ? ` for ${data.date}` : ""}.`);
+      } catch {
+        setExchangeRates(fallbackRates);
+        setExchangeStatus("Live exchange rates unavailable. Using backup rates.");
+      }
+    }
+    void loadExchangeRates();
   }, []);
 
   useEffect(() => {
@@ -455,7 +541,8 @@ export default function Home() {
       const bottle = toCollectionBottle(recognition);
       setRecognizedBottle(bottle);
       if (bottleIntent === "checking") rememberCheckedBottle(bottle);
-      setRecognitionStatus(`ChatGPT Vision match: ${recognition.vintage} ${recognition.producer}`);
+      setRecognitionStatus(`Identified ${recognition.vintage} ${recognition.producer}. Researching per-bottle price range...`);
+      void enrichScannedBottleWithResearch(bottle, bottleIntent);
       return;
     } catch (error) {
       console.error("Cellar bottle recognition failed:", error);
@@ -490,8 +577,10 @@ export default function Home() {
     }
     localStorage.setItem("cellar-profile-first-name", nameValue);
     localStorage.setItem("cellar-profile-cellar-name", cellarValue);
+    localStorage.setItem("cellar-profile-currency", profileCurrency);
     setFirstName(nameValue);
     setCellarName(cellarValue);
+    setCurrency(profileCurrency);
     setProfileStatus("Profile saved.");
   }
 
@@ -563,6 +652,62 @@ export default function Home() {
       localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(next));
     } catch {
       setCollectionBottles(next);
+    }
+  }
+
+  async function enrichScannedBottleWithResearch(bottle: CollectionBottle, intent: "collection" | "checking") {
+    try {
+      const response = await fetch("/api/research-wine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          producer: bottle.producer,
+          wine: bottle.wine,
+          vintage: bottle.vintage,
+          region: bottle.region,
+          appellation: bottle.appellation
+        })
+      });
+      if (!response.ok) throw new Error("Research unavailable");
+      const research = await response.json() as WineResearch;
+      const updatedBottle = {
+        ...bottle,
+        research,
+        note: research.summary || bottle.note,
+        style: research.wineColor || bottle.style,
+        tastingNotes: research.tastingNotes.length ? research.tastingNotes : bottle.tastingNotes,
+        drinkingWindow: research.drinkWindow.start && research.drinkWindow.end
+          ? `${research.drinkWindow.start}-${research.drinkWindow.end}`
+          : bottle.drinkingWindow,
+        window: research.drinkWindow.status || bottle.window,
+        priceRange: research.marketPriceRange || bottle.priceRange,
+        market: research.marketPriceRange || bottle.market,
+        foodPairing: [...research.communityPairings, ...research.sommelierPairings].join(", ") || bottle.foodPairing
+      };
+      setRecognizedBottle((current) =>
+        current?.producer === bottle.producer && current.wine === bottle.wine && current.vintage === bottle.vintage
+          ? updatedBottle
+          : current
+      );
+      if (intent === "checking") rememberCheckedBottle(updatedBottle);
+      setCollectionBottles((current) => {
+        const next = current.map((item) =>
+          item.producer === bottle.producer && item.wine === bottle.wine && item.vintage === bottle.vintage
+            ? updatedBottle
+            : item
+        );
+        if (next !== current && next.some((item) => item === updatedBottle)) {
+          try {
+            localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(next));
+          } catch {
+            // Keep the in-memory update even if local storage is full.
+          }
+        }
+        return next;
+      });
+      setRecognitionStatus(`Identified ${bottle.vintage} ${bottle.producer}. Per-bottle price range updated.`);
+    } catch {
+      setRecognitionStatus(`Identified ${bottle.vintage} ${bottle.producer}. Price range needs research from bottle details.`);
     }
   }
 
@@ -1092,7 +1237,7 @@ export default function Home() {
                   ["Grapes", researchedBottle.grapes],
                   ["Style", researchedBottle.style ?? researchedBottle.classification],
                   ["Classification", researchedBottle.classification],
-                  ["Bottle price range", researchedBottle.priceRange || "Research after opening details"],
+                  ["Bottle price range", displayPriceRange(researchedBottle.priceRange, currency, exchangeRates)],
                   ["Drinking window", researchedBottle.drinkingWindow],
                   ["Serving", researchedBottle.service],
                   ["Producer notes", researchedBottle.producerHistory ?? "Available when AI recognition is connected"],
@@ -1136,7 +1281,7 @@ export default function Home() {
                           <button className="min-w-0 flex-1 text-left" onClick={() => void openBottleDetails(bottle)}>
                             <p className="truncate text-sm font-semibold">{bottle.vintage} {bottle.producer}</p>
                             <p className="truncate text-xs text-cellar-walnut">{bottle.wine} / {regionLabel(bottle.region)}</p>
-                            <p className="mt-1 text-[11px] font-medium text-burgundy-700">Per-bottle range: {bottle.priceRange || "Research pending"}</p>
+                            <p className="mt-1 text-[11px] font-medium text-burgundy-700">Per-bottle range: {displayPriceRange(bottle.priceRange, currency, exchangeRates)}</p>
                             {bottle.scannedAt ? <p className="mt-1 text-[11px] text-cellar-walnut">Checked {new Date(bottle.scannedAt).toLocaleString()}</p> : null}
                           </button>
                           <button
@@ -1241,7 +1386,7 @@ export default function Home() {
                   <h3 className="mt-2 min-h-14 font-serif text-2xl leading-7">{bottle.wine}</h3>
                   <p className="mt-2 text-sm font-medium text-cellar-walnut">{bottle.appellation}</p>
                   <div className="mt-3 inline-flex rounded-full bg-cellar-parchment px-3 py-1 text-xs font-semibold text-burgundy-900">
-                    Per-bottle price range: {bottle.priceRange || "Research pending"}
+                    Per-bottle price range: {displayPriceRange(bottle.priceRange, currency, exchangeRates)}
                   </div>
                   {bottle.tastingNotes?.length ? (
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -1257,7 +1402,7 @@ export default function Home() {
                     {[
                       ["Grapes", bottle.grapes],
                       ["Drink", bottle.drinkingWindow],
-                      ["Bottle price range", bottle.priceRange || "Research after opening details"],
+                      ["Bottle price range", displayPriceRange(bottle.priceRange, currency, exchangeRates)],
                       ["Storage", bottle.cellar],
                       ["Service", bottle.service]
                     ].map(([label, value]) => (
@@ -1268,7 +1413,7 @@ export default function Home() {
                     ))}
                   </div>
                   <div className="mt-5 flex items-center justify-between gap-3 border-t border-cellar-oak/15 pt-4">
-                    <p className="text-xs leading-5 text-cellar-walnut">Added to {bottle.cellar}<br />Per bottle: {bottle.priceRange || "Research after opening details"}</p>
+                    <p className="text-xs leading-5 text-cellar-walnut">Added to {bottle.cellar}<br />Per bottle: {displayPriceRange(bottle.priceRange, currency, exchangeRates)}</p>
                     <div className="flex shrink-0 gap-2">
                       <button
                         className="rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-white"
@@ -1408,7 +1553,7 @@ export default function Home() {
           <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Profile & Settings</p>
           <h2 className="mt-2 font-serif text-4xl">Your Cellar profile</h2>
           <form
-            className="mt-5 grid max-w-3xl gap-2 sm:grid-cols-[1fr_1fr_auto]"
+            className="mt-5 grid max-w-4xl gap-2 sm:grid-cols-[1fr_1fr_170px_auto]"
             onSubmit={(event) => {
               event.preventDefault();
               saveProfile();
@@ -1429,9 +1574,19 @@ export default function Home() {
               placeholder="Cellar name"
               aria-label="Cellar name"
             />
+            <select
+              className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+              value={profileCurrency}
+              onChange={(event) => setProfileCurrency(event.target.value as CurrencyCode)}
+              aria-label="Preferred currency"
+            >
+              {(Object.keys(currencyLabels) as CurrencyCode[]).map((code) => (
+                <option value={code} key={code}>{currencyLabels[code]}</option>
+              ))}
+            </select>
             <button className="rounded-md bg-burgundy-700 px-5 py-3 text-sm font-medium text-white" type="submit">Save profile</button>
           </form>
-          <p className="mt-2 min-h-5 text-sm text-cellar-walnut" role="status">{profileStatus}</p>
+          <p className="mt-2 min-h-5 text-sm text-cellar-walnut" role="status">{profileStatus || `${exchangeStatus} Showing prices in ${currencyLabels[currency]}.`}</p>
         </div>
       </section>
 
@@ -1535,7 +1690,7 @@ export default function Home() {
                       <p className="mt-4 text-sm leading-6 text-cellar-walnut">{activeBottle.research.drinkWindow.reason}</p>
                       <div className="mt-5 rounded-md bg-white/55 p-4">
                         <p className="text-xs uppercase tracking-[0.14em] text-burgundy-700">Current per-bottle price range</p>
-                        <p className="mt-2 font-serif text-2xl">{activeBottle.research.marketPriceRange}</p>
+                        <p className="mt-2 font-serif text-2xl">{displayPriceRange(activeBottle.research.marketPriceRange, currency, exchangeRates)}</p>
                         <p className="mt-2 text-sm leading-6 text-cellar-walnut">{activeBottle.research.marketPriceNote}</p>
                       </div>
                     </div>
@@ -1569,7 +1724,7 @@ export default function Home() {
                     ["Grapes", activeBottle.grapes],
                     ["Service", activeBottle.service],
                     ["Current window", activeBottle.drinkingWindow],
-                    ["Bottle price range", activeBottle.priceRange || "Research after opening details"]
+                    ["Bottle price range", displayPriceRange(activeBottle.priceRange, currency, exchangeRates)]
                   ].map(([label, value]) => (
                     <div key={label}>
                       <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">{label}</p>

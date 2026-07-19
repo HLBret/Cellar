@@ -922,11 +922,13 @@
         border-top: 1px solid rgba(142,96,72,.2);
         padding: 28px 0 12px;
       }
-      .profile-form { display: grid; grid-template-columns: minmax(180px, 320px) auto; gap: 8px; margin-top: 16px; }
-      .profile-form input {
+      .profile-form { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) 150px auto; gap: 8px; margin-top: 16px; }
+      .profile-form input,
+      .profile-form select {
         border: 1px solid rgba(142,96,72,.25);
         border-radius: 6px;
         background: white;
+        color: var(--ink);
         padding: 12px;
         font: inherit;
       }
@@ -1207,6 +1209,11 @@
         <form class="profile-form" id="profile-form">
           <input id="profile-first-name" type="text" placeholder="First name" autocomplete="given-name" aria-label="First name" />
           <input id="profile-cellar-name" type="text" placeholder="Cellar name" aria-label="Cellar name" />
+          <select id="profile-currency" aria-label="Preferred currency">
+            <option value="GBP">GBP (£)</option>
+            <option value="USD">USD ($)</option>
+            <option value="EUR">Euro (€)</option>
+          </select>
           <button type="submit">Save profile</button>
         </form>
         <p class="profile-status" id="profile-status" role="status"></p>
@@ -1247,6 +1254,8 @@
       let bottlePhotoReady = false;
       let currentResearchIndex = -1;
       let checkedBottles = [];
+      let activeCurrency = localStorage.getItem("cellar-profile-currency") || "GBP";
+      let exchangeRates = { GBP: 1, USD: 1.29, EUR: 1.16 };
       try {
         const savedChecks = JSON.parse(localStorage.getItem("cellar-checked-bottles-v1") || "[]");
         if (Array.isArray(savedChecks)) checkedBottles = savedChecks;
@@ -1305,6 +1314,51 @@
         return currentResearchIndex >= 0 ? researchedWines[currentResearchIndex] : null;
       }
 
+      function sourceCurrencyForRange(range) {
+        if (range.includes("$")) return "USD";
+        if (range.includes("€")) return "EUR";
+        return "GBP";
+      }
+
+      function formatCurrencyAmount(amount, currency) {
+        return new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency,
+          maximumFractionDigits: amount >= 100 ? 0 : 2
+        }).format(amount);
+      }
+
+      function displayPriceRange(priceRange) {
+        if (!priceRange || /research|pending|not enough|not publicly/i.test(priceRange)) return priceRange || "Research after opening details";
+        const amounts = [...priceRange.matchAll(/([\d,]+(?:\.\d+)?)/g)]
+          .map((match) => Number(match[1].replace(/,/g, "")))
+          .filter((amount) => Number.isFinite(amount));
+        if (!amounts.length) return priceRange;
+        const sourceCurrency = sourceCurrencyForRange(priceRange);
+        const converted = amounts.slice(0, 2).map((amount) => {
+          const gbp = sourceCurrency === "GBP" ? amount : amount / exchangeRates[sourceCurrency];
+          return gbp * exchangeRates[activeCurrency];
+        });
+        const suffix = priceRange.match(/per .*/i)?.[0] || "per 750 ml bottle";
+        if (converted.length === 1) return `${formatCurrencyAmount(converted[0], activeCurrency)} ${suffix}`;
+        return `${formatCurrencyAmount(Math.min(...converted), activeCurrency)}-${formatCurrencyAmount(Math.max(...converted), activeCurrency)} ${suffix}`;
+      }
+
+      async function loadExchangeRates() {
+        try {
+          const response = await fetch("https://api.frankfurter.app/latest?from=GBP&to=USD,EUR");
+          if (!response.ok) throw new Error("Exchange rates unavailable");
+          const data = await response.json();
+          exchangeRates = { GBP: 1, USD: data.rates?.USD || exchangeRates.USD, EUR: data.rates?.EUR || exchangeRates.EUR };
+          profileStatus.textContent = `Live exchange rates loaded${data.date ? ` for ${data.date}` : ""}.`;
+          renderRecognition();
+          renderCheckedHistory();
+          renderCollection();
+        } catch (error) {
+          profileStatus.textContent = "Live exchange rates unavailable. Using backup rates.";
+        }
+      }
+
       function persistCheckedBottles() {
         try {
           localStorage.setItem("cellar-checked-bottles-v1", JSON.stringify(checkedBottles));
@@ -1331,7 +1385,7 @@
             <div>
               <strong>${wine.vintage} ${wine.producer}</strong>
               <span>${wine.wine} / ${regionLabel(wine.region)}</span>
-              <small>Per-bottle range: ${wine.priceRange || wine.market || "Research pending"}</small>
+              <small>Per-bottle range: ${displayPriceRange(wine.priceRange || wine.market)}</small>
               ${wine.scannedAt ? `<span>Checked ${new Date(wine.scannedAt).toLocaleString()}</span>` : ""}
             </div>
             <button type="button" data-add-checked="${index}">Add</button>
@@ -1363,7 +1417,7 @@
         const details = [
           ["Producer", wine.producer], ["Wine", wine.wine], ["Vintage", wine.vintage], ["Region", wine.region],
           ["Appellation", wine.appellation], ["Grapes", wine.grapes], ["Classification", wine.classification],
-          ["Bottle price range", wine.priceRange || "Research after opening details"],
+          ["Bottle price range", displayPriceRange(wine.priceRange || wine.market)],
           ["Drinking window", wine.window], ["Serving", wine.service],
           ["Producer notes", wine.producerHistory || "Detailed producer notes require AI recognition."],
           ["Vintage notes", wine.vintageSummary || "Detailed vintage notes require AI recognition."],
@@ -1673,21 +1727,21 @@
               <div class="wine-card-producer">${wine.producer}</div>
               <h3>${wine.wine}</h3>
               <p class="wine-card-meta">${wine.appellation}</p>
-              <div class="wine-price-pill">Per-bottle price range: ${wine.priceRange || wine.market || "Research pending"}</div>
+              <div class="wine-price-pill">Per-bottle price range: ${displayPriceRange(wine.priceRange || wine.market)}</div>
               ${(wine.tastingNotes || []).length
                 ? `<div class="wine-note-pills">${wine.tastingNotes.slice(0, 6).map((note) => `<span>${note}</span>`).join("")}</div>`
                 : `<p class="wine-card-note">${wine.note}</p>`}
               <div class="wine-details">
                 <div><small>Grapes</small><b>${wine.grapes}</b></div>
                 <div><small>Drink</small><b>${wine.window}</b></div>
-                <div><small>Bottle price range</small><b>${wine.priceRange || wine.market || "Research pending"}</b></div>
+                <div><small>Bottle price range</small><b>${displayPriceRange(wine.priceRange || wine.market)}</b></div>
                 <div><small>Storage</small><b>${wine.storage}</b></div>
                 <div><small>Service</small><b>${wine.service}</b></div>
               </div>
               <div class="wine-card-foot">
-                <p>Added to ${wine.storage}<br>Per bottle: ${wine.priceRange || wine.market || "Research pending"}</p>
+                <p>Added to ${wine.storage}<br>Per bottle: ${displayPriceRange(wine.priceRange || wine.market)}</p>
                 <div class="wine-card-actions">
-                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Per-bottle price range ${wine.priceRange || wine.market || "Research pending"}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
+                  <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Per-bottle price range ${displayPriceRange(wine.priceRange || wine.market)}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
                   <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
                 </div>
               </div>
@@ -1886,6 +1940,7 @@
       const profileForm = document.getElementById("profile-form");
       const profileFirstName = document.getElementById("profile-first-name");
       const profileCellarName = document.getElementById("profile-cellar-name");
+      const profileCurrency = document.getElementById("profile-currency");
       const profileStatus = document.getElementById("profile-status");
       const welcomeHeading = document.getElementById("welcome-heading");
       const heroCellarName = document.getElementById("hero-cellar-name");
@@ -1911,8 +1966,10 @@
         welcomeHeading.append(nameLine);
       }
       const savedFirstName = localStorage.getItem("cellar-profile-first-name") || "";
+      if (["GBP", "USD", "EUR"].includes(activeCurrency)) profileCurrency.value = activeCurrency;
       applyFirstName(savedFirstName);
       applyCellarName(activeCellarName);
+      void loadExchangeRates();
       profileForm.addEventListener("submit", (event) => {
         event.preventDefault();
         const firstName = profileFirstName.value.trim();
@@ -1923,9 +1980,14 @@
         }
         localStorage.setItem("cellar-profile-first-name", firstName);
         localStorage.setItem("cellar-profile-cellar-name", cellarName);
+        localStorage.setItem("cellar-profile-currency", profileCurrency.value);
+        activeCurrency = profileCurrency.value;
         applyFirstName(firstName);
         applyCellarName(cellarName);
-        profileStatus.textContent = "Profile saved.";
+        renderRecognition();
+        renderCheckedHistory();
+        renderCollection();
+        profileStatus.textContent = `Profile saved. Showing prices in ${profileCurrency.options[profileCurrency.selectedIndex].text}.`;
       });
 
       const actionModal = document.getElementById("action-modal");
