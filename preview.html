@@ -40,6 +40,46 @@
           radial-gradient(circle at 20% 20%, rgba(199, 162, 90, .2), transparent 30%),
           linear-gradient(180deg, #fbf7ed 0%, #f6efe1 100%);
       }
+      .shell.auth-locked { display: none; }
+      .login-gate {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 28px 16px;
+        color: var(--cream);
+        background:
+          radial-gradient(circle at 50% 0%, rgba(199,162,90,.25), transparent 30%),
+          linear-gradient(180deg, #2a1118, #130b0d);
+      }
+      .login-card {
+        width: min(100%, 560px);
+        border: 1px solid rgba(199,162,90,.24);
+        border-radius: 8px;
+        background: var(--paper);
+        color: var(--ink);
+        padding: 28px;
+        box-shadow: 0 24px 70px rgba(0,0,0,.34);
+      }
+      .login-card h1 { margin: 10px 0 0; font: 500 44px Georgia, serif; }
+      .login-card p { color: var(--oak); line-height: 1.65; }
+      .login-form { display: grid; gap: 10px; margin-top: 20px; }
+      .login-form input {
+        border: 1px solid rgba(142,96,72,.25);
+        border-radius: 6px;
+        background: white;
+        color: var(--ink);
+        padding: 13px;
+        font: inherit;
+      }
+      .login-form button {
+        border-radius: 6px;
+        background: var(--burgundy);
+        color: white;
+        padding: 13px;
+        font-weight: 800;
+      }
+      .login-toggle { margin-top: 14px; color: var(--burgundy); font-weight: 800; }
+      .login-status { min-height: 20px; font-size: 14px; }
       .topbar {
         position: relative;
         z-index: 20;
@@ -466,23 +506,26 @@
       }
       .wine-card:hover .premium-card-main:before { opacity: 1; }
       .digital-bottle-wrap { position: relative; display: grid; place-items: center; }
-      .digital-shadow { position: absolute; bottom: 5px; width: 96px; height: 20px; border-radius: 999px; background: rgba(0,0,0,.2); filter: blur(8px); transition: transform .45s ease; }
+      .digital-shadow { position: absolute; bottom: 0; width: 112px; height: 20px; border-radius: 999px; background: rgba(0,0,0,.2); filter: blur(8px); transition: transform .45s ease; }
       .wine-card:hover .digital-shadow { transform: scale(1.1); }
-      .digital-bottle { position: relative; width: 96px; height: 256px; transform-origin: bottom; transition: transform .45s ease; }
+      .digital-bottle { position: relative; width: 112px; height: 288px; transform-origin: bottom; transition: transform .45s ease; }
       .wine-card:hover .digital-bottle { transform: translateY(-8px) rotate(-2deg); }
-      .digital-neck { position: absolute; left: 50%; top: 0; width: 32px; height: 48px; transform: translateX(-50%); border-radius: 999px 999px 0 0; background: linear-gradient(90deg,#271315,#101010,#050505); }
-      .digital-shoulder { position: absolute; left: 50%; top: 36px; width: 48px; height: 32px; transform: translateX(-50%); border-radius: 16px 16px 0 0; background: linear-gradient(90deg,#271315,#101010,#050505); }
-      .digital-body { position: absolute; left: 50%; bottom: 0; width: 96px; height: 210px; transform: translateX(-50%); overflow: hidden; border-radius: 34px 34px 12px 12px; background: linear-gradient(90deg,#271315,#101010,#050505); box-shadow: inset 12px 0 18px rgba(255,255,255,.11), inset -14px 0 20px rgba(0,0,0,.42), 0 18px 28px rgba(32,23,21,.24); }
+      .digital-lip { position: absolute; left: 50%; top: 0; z-index: 3; width: 44px; height: 12px; transform: translateX(-50%); border-radius: 999px; background: var(--gold); box-shadow: 0 3px 10px rgba(0,0,0,.18); }
+      .digital-neck { position: absolute; left: 50%; top: 8px; z-index: 2; width: 36px; height: 80px; transform: translateX(-50%); border-radius: 7px 7px 0 0; background: linear-gradient(90deg,#271315,#101010,#050505); box-shadow: inset 8px 0 12px rgba(255,255,255,.16), inset -10px 0 16px rgba(0,0,0,.38); }
+      .digital-capsule { position: absolute; left: 50%; top: 28px; z-index: 3; width: 40px; height: 40px; transform: translateX(-50%); border-top: 1px solid rgba(199,162,90,.35); border-bottom: 1px solid rgba(199,162,90,.35); border-radius: 3px; background: rgba(101,20,44,.82); }
+      .digital-shoulder { position: absolute; left: 50%; top: 70px; width: 96px; height: 64px; transform: translateX(-50%); border-radius: 48px 48px 0 0; background: linear-gradient(90deg,#271315,#101010,#050505); box-shadow: inset 10px 0 14px rgba(255,255,255,.12), inset -12px 0 16px rgba(0,0,0,.38); }
+      .digital-body { position: absolute; left: 50%; bottom: 0; width: 112px; height: 190px; transform: translateX(-50%); overflow: hidden; border-radius: 36px 36px 18px 18px; background: linear-gradient(90deg,#271315,#101010,#050505); box-shadow: inset 14px 0 20px rgba(255,255,255,.12), inset -18px 0 24px rgba(0,0,0,.46), 0 20px 30px rgba(32,23,21,.24); }
       .digital-bottle.light .digital-neck,
       .digital-bottle.light .digital-shoulder,
       .digital-bottle.light .digital-body { background: linear-gradient(90deg,#e6d79d,#6d7957,#17231d); }
-      .digital-highlight { position: absolute; left: 16px; top: 16px; width: 12px; height: 176px; border-radius: 999px; background: rgba(255,255,255,.18); filter: blur(4px); transition: transform .45s ease; }
+      .digital-highlight { position: absolute; left: 16px; top: 12px; width: 12px; height: 176px; border-radius: 999px; background: rgba(255,255,255,.18); filter: blur(4px); transition: transform .45s ease; }
       .wine-card:hover .digital-highlight { transform: translateX(4px); }
-      .digital-label { position: absolute; left: 8px; right: 8px; top: 80px; border: 1px solid rgba(59,12,27,.18); border-radius: 6px; background: #f7efe4; padding: 12px 8px; text-align: center; box-shadow: 0 12px 36px rgba(63,41,35,.12); }
+      .digital-label { position: absolute; left: 8px; right: 8px; top: 64px; border: 1px solid rgba(59,12,27,.18); border-radius: 3px; background: #f7efe4; padding: 12px 8px; text-align: center; box-shadow: 0 12px 36px rgba(63,41,35,.12); }
       .digital-label small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--burgundy); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; }
       .digital-label strong { display: block; margin-top: 4px; font: 500 18px Georgia, serif; }
       .digital-label b { display: block; margin-top: 4px; color: var(--ink); font-size: 10px; line-height: 1.2; }
       .digital-label em { display: block; margin-top: 8px; color: var(--oak); font-size: 8px; font-style: normal; letter-spacing: .1em; text-transform: uppercase; }
+      .digital-punt { position: absolute; left: 50%; bottom: 12px; width: 56px; height: 20px; transform: translateX(-50%); border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(0,0,0,.22); }
       .digital-shine { position: absolute; inset: 0; transform: translateX(-120%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent); transition: transform .7s ease; }
       .wine-card:hover .digital-shine { transform: translateX(120%); }
       .premium-card-copy { position: relative; min-width: 0; }
@@ -1080,7 +1123,22 @@
     </style>
   </head>
   <body>
-    <main class="shell">
+    <section class="login-gate" id="login-gate">
+      <div class="login-card">
+        <p class="eyebrow">Cellar</p>
+        <h1>Sign in to your cellar</h1>
+        <p>Create your profile or sign in before entering your shared collection.</p>
+        <form class="login-form" id="login-form">
+          <input id="login-name" type="text" placeholder="Name" autocomplete="name" aria-label="Account name" />
+          <input id="login-email" type="email" placeholder="Email" autocomplete="email" aria-label="Account email" />
+          <input id="login-password" type="password" placeholder="Password" autocomplete="new-password" aria-label="Account password" />
+          <button id="login-submit" type="submit">Create profile and enter</button>
+        </form>
+        <button class="login-toggle" id="login-toggle" type="button">Already have an account? Sign in</button>
+        <p class="login-status" id="login-status" role="status">Local preview sign-in is active.</p>
+      </div>
+    </section>
+    <main class="shell auth-locked">
       <header class="topbar">
         <div class="brand">
           <div><strong class="serif">Cellar</strong><span>Private collection</span></div>
@@ -1157,7 +1215,7 @@
               <button class="sommelier-send" type="submit">Send</button>
             </form>
             <div class="sommelier-prompts">
-              <button type="button" data-sommelier-prompt="What pairs with duck?">Pair with duck</button>
+              <button type="button" data-sommelier-prompt="Pair with a meal">Pair with a meal</button>
               <button type="button" data-sommelier-prompt="What should I open tonight?">Open tonight</button>
               <button type="button" data-sommelier-prompt="Which wines should I keep aging?">Keep aging</button>
             </div>
@@ -1504,9 +1562,12 @@
         const amounts = [...priceRange.matchAll(/([\d,]+(?:\.\d+)?)/g)]
           .map((match) => Number(match[1].replace(/,/g, "")))
           .filter((amount) => Number.isFinite(amount));
-        if (!amounts.length) return priceRange;
+        const looksLikeBrokenRange = /(?:[$£€]\s*(?:-|to)|(?:-|to)\s*[$£€])/i.test(priceRange) && amounts.length < 2;
+        if (!amounts.length || looksLikeBrokenRange) return "Price range needs research";
         const sourceCurrency = sourceCurrencyForRange(priceRange);
-        const converted = amounts.slice(0, 2).map((amount) => {
+        const cleaned = amounts.filter((amount) => amount > 0 && amount < 50000).slice(0, 2);
+        if (!cleaned.length) return "Price range needs research";
+        const converted = cleaned.map((amount) => {
           const gbp = sourceCurrency === "GBP" ? amount : amount / exchangeRates[sourceCurrency];
           return gbp * exchangeRates[activeCurrency];
         });
@@ -1879,6 +1940,7 @@
         const researchedBottle = currentResearchedWine();
         if (!researchedBottle) return;
         addBottleToCollection(researchedBottle);
+        refreshRecognition();
       }
 
       function updateCollectionStats() {
@@ -1938,7 +2000,9 @@
               <div class="digital-bottle-wrap">
                 <div class="digital-shadow"></div>
                 <div class="digital-bottle ${["White", "Rosé", "Sparkling"].includes(wineTypeForBottle(wine)) ? "light" : ""}">
+                  <div class="digital-lip"></div>
                   <div class="digital-neck"></div>
+                  <div class="digital-capsule"></div>
                   <div class="digital-shoulder"></div>
                   <div class="digital-body">
                     <div class="digital-highlight"></div>
@@ -1949,6 +2013,7 @@
                       <em>${wine.appellation}</em>
                       <small>${wineTypeForBottle(wine)}</small>
                     </div>
+                    <div class="digital-punt"></div>
                     <div class="digital-shine"></div>
                   </div>
                 </div>
@@ -2010,6 +2075,11 @@
         const red = collectionBottles.find((wine) => /pinot noir|cabernet|nebbiolo|syrah|merlot/i.test(`${wine.grapes} ${wine.wine}`));
         const bottle = collectionBottles[0];
 
+        if (/pair with a meal|pair a meal|meal pairing/.test(query)) {
+          return collectionBottles.length
+            ? "Tell me what you are making, how it is prepared, and whether you want something classic or adventurous. I will choose the best options from your cellar."
+            : "Tell me what you are making and I can recommend the style to look for. Once bottles are in your cellar, I will choose exact bottles.";
+        }
         if (/duck|lamb|beef|steak/.test(query)) {
           return red
             ? `I would open your ${red.vintage} ${red.producer} ${red.wine}. Serve it ${red.service}; its ${red.maturity.toLowerCase()} profile should suit the richness of the dish.`
@@ -2185,6 +2255,15 @@
       const accountStatus = document.getElementById("account-status");
       const accountCard = document.getElementById("account-card");
       const accountSignout = document.getElementById("account-signout");
+      const appShell = document.querySelector(".shell");
+      const loginGate = document.getElementById("login-gate");
+      const loginForm = document.getElementById("login-form");
+      const loginName = document.getElementById("login-name");
+      const loginEmail = document.getElementById("login-email");
+      const loginPassword = document.getElementById("login-password");
+      const loginSubmit = document.getElementById("login-submit");
+      const loginToggle = document.getElementById("login-toggle");
+      const loginStatus = document.getElementById("login-status");
       const accountsStorageKey = "cellar-shared-accounts-v1";
       const sessionStorageKey = "cellar-active-account-v1";
       let accountMode = "create";
@@ -2194,6 +2273,8 @@
         localStorage.setItem(accountsStorageKey, JSON.stringify(previewAccounts));
       }
       function renderAccountPanel(message = "") {
+        loginGate.hidden = Boolean(currentAccount);
+        appShell.classList.toggle("auth-locked", !currentAccount);
         accountCard.hidden = !currentAccount;
         accountSignout.hidden = !currentAccount;
         accountForm.hidden = Boolean(currentAccount);
@@ -2211,14 +2292,19 @@
         accountSubmit.textContent = accountMode === "create" ? "Create account" : "Sign in";
         accountToggle.textContent = accountMode === "create" ? "Already have an account? Sign in" : "Need an account? Create one";
         accountPassword.autocomplete = accountMode === "create" ? "new-password" : "current-password";
+        loginName.hidden = accountMode === "signin";
+        loginName.required = accountMode === "create";
+        loginSubmit.textContent = accountMode === "create" ? "Create profile and enter" : "Sign in";
+        loginToggle.textContent = accountMode === "create" ? "Already have an account? Sign in" : "Need an account? Create one";
+        loginPassword.autocomplete = accountMode === "create" ? "new-password" : "current-password";
         accountStatus.textContent = message || (currentAccount ? "This preview is using the shared cellar account." : "Accounts are saved locally in this preview.");
+        loginStatus.textContent = message || "Local preview sign-in is active.";
       }
-      accountForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const email = accountEmail.value.trim().toLowerCase();
-        const password = accountPassword.value;
+      function submitPreviewAccount(nameValue, emailValue, passwordValue) {
+        const email = emailValue.trim().toLowerCase();
+        const password = passwordValue;
         if (accountMode === "create") {
-          const name = accountName.value.trim();
+          const name = nameValue.trim();
           if (!name || !email || !password) {
             renderAccountPanel("Enter a name, email, and password.");
             return;
@@ -2239,7 +2325,6 @@
           applyFirstName(name.split(" ")[0] || name);
           applyCellarName(`${name.split(" ")[0] || name}'s Cellar`);
           profileStatus.textContent = "Profile updated from shared account.";
-          accountForm.reset();
           renderAccountPanel(`Signed in as ${name}.`);
           return;
         }
@@ -2250,10 +2335,23 @@
         }
         currentAccount = match;
         localStorage.setItem(sessionStorageKey, match.id);
-        accountForm.reset();
         renderAccountPanel(`Signed in to ${match.name}'s shared cellar.`);
+      }
+      accountForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitPreviewAccount(accountName.value, accountEmail.value, accountPassword.value);
+        accountForm.reset();
+      });
+      loginForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitPreviewAccount(loginName.value, loginEmail.value, loginPassword.value);
+        if (currentAccount) loginForm.reset();
       });
       accountToggle.addEventListener("click", () => {
+        accountMode = accountMode === "create" ? "signin" : "create";
+        renderAccountPanel();
+      });
+      loginToggle.addEventListener("click", () => {
         accountMode = accountMode === "create" ? "signin" : "create";
         renderAccountPanel();
       });

@@ -66,6 +66,7 @@ type WineResearch = {
 };
 
 type CollectionBottle = {
+  cloudId?: string;
   producer: string;
   wine: string;
   vintage: string;
@@ -105,12 +106,35 @@ type CellarAccount = {
   id: string;
   name: string;
   email: string;
-  password: string;
+  password?: string;
+  cellarId?: string;
   createdAt: string;
+};
+
+type SupabaseSession = {
+  access_token: string;
+  refresh_token?: string;
+  user: {
+    id: string;
+    email?: string;
+    user_metadata?: {
+      name?: string;
+    };
+  };
+};
+
+type CloudBottleRow = {
+  id: string;
+  cellar_id: string;
+  data: CollectionBottle;
 };
 
 const accountsStorageKey = "cellar-shared-accounts-v1";
 const sessionStorageKey = "cellar-active-account-v1";
+const supabaseSessionStorageKey = "cellar-supabase-session-v1";
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 
 function storageKeyForAccount(account: CellarAccount | null, key: string) {
   return account ? `cellar-account:${account.id}:${key}` : key;
@@ -365,9 +389,14 @@ function displayPriceRange(priceRange: string | undefined, currency: CurrencyCod
   const matches = [...priceRange.matchAll(/([\d,]+(?:\.\d+)?)/g)]
     .map((match) => Number(match[1].replace(/,/g, "")))
     .filter((amount) => Number.isFinite(amount));
-  if (!matches.length) return priceRange;
+  const looksLikeBrokenRange = /(?:[$£€]\s*(?:-|to)|(?:-|to)\s*[$£€])/i.test(priceRange) && matches.length < 2;
+  if (!matches.length || looksLikeBrokenRange) return "Price range needs research";
   const sourceCurrency = sourceCurrencyForRange(priceRange);
-  const converted = matches.slice(0, 2).map((amount) => amountToGbp(amount, sourceCurrency, rates) * rates[currency]);
+  const cleaned = matches
+    .filter((amount) => amount > 0 && amount < 50000)
+    .slice(0, 2);
+  if (!cleaned.length) return "Price range needs research";
+  const converted = cleaned.map((amount) => amountToGbp(amount, sourceCurrency, rates) * rates[currency]);
   const suffix = priceRange.match(/per .*/i)?.[0] ?? "per 750 ml bottle";
   if (converted.length === 1) return `${formatCurrencyAmount(converted[0], currency)} ${suffix}`;
   return `${formatCurrencyAmount(Math.min(...converted), currency)}-${formatCurrencyAmount(Math.max(...converted), currency)} ${suffix}`;
@@ -440,6 +469,8 @@ export default function Home() {
   const [accountEmail, setAccountEmail] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
   const [accountStatus, setAccountStatus] = useState("");
+  const [supabaseSession, setSupabaseSession] = useState<SupabaseSession | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const researchedBottle = recognizedBottle ?? researchedWines[Math.max(researchIndex, 0)];
   const tonight = liveTonight ?? {
     label: "",
@@ -514,6 +545,98 @@ export default function Home() {
   const selectedRegionReadyBottles = selectedRegionBottles.filter((bottle) => /peak/i.test(bottle.window));
   const scopedStorageKey = (key: string) => storageKeyForAccount(currentAccount, key);
 
+  async function supabaseRequest<T>(path: string, options: RequestInit = {}, token = supabaseSession?.access_token): Promise<T> {
+    if (!hasSupabaseConfig) throw new Error("Supabase is not configured.");
+    const headers = new Headers(options.headers);
+    headers.set("apikey", supabaseAnonKey);
+    headers.set("Authorization", `Bearer ${token ?? supabaseAnonKey}`);
+    if (!headers.has("Content-Type") && options.body) headers.set("Content-Type", "application/json");
+    const response = await fetch(`${supabaseUrl}${path}`, { ...options, headers });
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Supabase request failed with ${response.status}`);
+    }
+    if (response.status === 204) return undefined as T;
+    return response.json() as Promise<T>;
+  }
+
+  async function ensureCloudCellar(session: SupabaseSession, displayName: string) {
+    const existingMemberships = await supabaseRequest<Array<{ cellar_id: string }>>(
+      `/rest/v1/cellar_members?select=cellar_id&user_id=eq.${session.user.id}&limit=1`,
+      {},
+      session.access_token
+    );
+    if (existingMemberships[0]?.cellar_id) return existingMemberships[0].cellar_id;
+
+    const cellarNameValue = `${displayName.split(" ")[0] || displayName}'s Cellar`;
+    const createdCellars = await supabaseRequest<Array<{ id: string }>>(
+      "/rest/v1/cellars?select=id",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify([{ name: cellarNameValue, owner_id: session.user.id }])
+      },
+      session.access_token
+    );
+    const cellarId = createdCellars[0]?.id;
+    if (!cellarId) throw new Error("Cellar could not be created.");
+    await supabaseRequest(
+      "/rest/v1/cellar_members",
+      {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{ cellar_id: cellarId, user_id: session.user.id, role: "owner" }])
+      },
+      session.access_token
+    );
+    return cellarId;
+  }
+
+  async function loadCloudBottles(session: SupabaseSession, account: CellarAccount) {
+    if (!account.cellarId) return;
+    const rows = await supabaseRequest<CloudBottleRow[]>(
+      `/rest/v1/bottles?select=id,cellar_id,data&cellar_id=eq.${account.cellarId}&order=created_at.desc`,
+      {},
+      session.access_token
+    );
+    const bottles = rows.map((row) => ({ ...row.data, cloudId: row.id, cellar: row.data.cellar || cellarName }));
+    setCollectionBottles(bottles);
+    localStorage.setItem(storageKeyForAccount(account, "cellar-collection-bottles-v2"), JSON.stringify(bottles));
+  }
+
+  async function syncCloudBottles(next: CollectionBottle[], account = currentAccount, session = supabaseSession) {
+    if (!account?.cellarId || !session) return;
+    await supabaseRequest(
+      `/rest/v1/bottles?cellar_id=eq.${account.cellarId}`,
+      { method: "DELETE", headers: { Prefer: "return=minimal" } },
+      session.access_token
+    );
+    if (!next.length) return;
+    const rows = await supabaseRequest<CloudBottleRow[]>(
+      "/rest/v1/bottles?select=id,cellar_id,data",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify(next.map(({ cloudId, ...data }) => ({ cellar_id: account.cellarId, data })))
+      },
+      session.access_token
+    );
+    const savedBottles = rows.map((row) => ({ ...row.data, cloudId: row.id }));
+    setCollectionBottles(savedBottles);
+    localStorage.setItem(storageKeyForAccount(account, "cellar-collection-bottles-v2"), JSON.stringify(savedBottles));
+  }
+
+  function accountFromSession(session: SupabaseSession, cellarId?: string): CellarAccount {
+    const name = session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Cellar user";
+    return {
+      id: session.user.id,
+      name,
+      email: session.user.email ?? "",
+      cellarId,
+      createdAt: new Date().toISOString()
+    };
+  }
+
   function loadCellarData(account: CellarAccount | null) {
     const collectionKey = storageKeyForAccount(account, "cellar-collection-bottles-v2");
     const checksKey = storageKeyForAccount(account, "cellar-checked-bottles-v1");
@@ -574,18 +697,37 @@ export default function Home() {
     };
     window.addEventListener("hashchange", handleHashChange);
     if (!window.location.hash) window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
-    try {
-      const savedAccounts = JSON.parse(localStorage.getItem(accountsStorageKey) ?? "[]");
-      const normalizedAccounts = Array.isArray(savedAccounts) ? savedAccounts : [];
-      const sessionId = localStorage.getItem(sessionStorageKey);
-      const sessionAccount = normalizedAccounts.find((account: CellarAccount) => account.id === sessionId) ?? null;
-      setAccounts(normalizedAccounts);
-      setCurrentAccount(sessionAccount);
-      setAuthMode(sessionAccount ? "signin" : "create");
-      loadCellarData(sessionAccount);
-    } catch {
-      loadCellarData(null);
-    }
+    void (async () => {
+      try {
+        if (hasSupabaseConfig) {
+          const savedCloudSession = JSON.parse(localStorage.getItem(supabaseSessionStorageKey) ?? "null") as SupabaseSession | null;
+          if (savedCloudSession?.access_token && savedCloudSession.user?.id) {
+            setSupabaseSession(savedCloudSession);
+            const cellarId = await ensureCloudCellar(savedCloudSession, savedCloudSession.user.user_metadata?.name || "Cellar");
+            const cloudAccount = accountFromSession(savedCloudSession, cellarId);
+            setCurrentAccount(cloudAccount);
+            setAuthMode("signin");
+            loadCellarData(cloudAccount);
+            await loadCloudBottles(savedCloudSession, cloudAccount);
+            setAccountStatus(`Signed in to ${cloudAccount.name}'s shared cellar.`);
+            return;
+          }
+        }
+        const savedAccounts = JSON.parse(localStorage.getItem(accountsStorageKey) ?? "[]");
+        const normalizedAccounts = Array.isArray(savedAccounts) ? savedAccounts : [];
+        const sessionId = localStorage.getItem(sessionStorageKey);
+        const sessionAccount = normalizedAccounts.find((account: CellarAccount) => account.id === sessionId) ?? null;
+        setAccounts(normalizedAccounts);
+        setCurrentAccount(sessionAccount);
+        setAuthMode(sessionAccount ? "signin" : "create");
+        loadCellarData(sessionAccount);
+      } catch (error) {
+        console.error("Cellar account restore failed:", error);
+        loadCellarData(null);
+      } finally {
+        setAuthReady(true);
+      }
+    })();
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
@@ -703,7 +845,7 @@ export default function Home() {
     setAccountPassword("");
   }
 
-  function createAccount() {
+  async function createAccount() {
     const name = accountName.trim();
     const email = accountEmail.trim().toLowerCase();
     const password = accountPassword;
@@ -717,6 +859,42 @@ export default function Home() {
     }
     if (password.length < 6) {
       setAccountStatus("Use at least 6 characters for the password.");
+      return;
+    }
+    if (hasSupabaseConfig) {
+      setAccountStatus("Creating your shared cellar account...");
+      try {
+        const session = await supabaseRequest<SupabaseSession>(
+          "/auth/v1/signup",
+          {
+            method: "POST",
+            body: JSON.stringify({ email, password, data: { name } })
+          },
+          supabaseAnonKey
+        );
+        if (!session.access_token) {
+          setAccountStatus("Account created. Check your email to confirm it, then sign in.");
+          setAuthMode("signin");
+          resetAuthForm();
+          return;
+        }
+        const cellarId = await ensureCloudCellar(session, name);
+        const cloudAccount = accountFromSession(session, cellarId);
+        setSupabaseSession(session);
+        setCurrentAccount(cloudAccount);
+        localStorage.setItem(supabaseSessionStorageKey, JSON.stringify(session));
+        localStorage.setItem(sessionStorageKey, cloudAccount.id);
+        localStorage.setItem(storageKeyForAccount(cloudAccount, "cellar-profile-first-name"), name.split(" ")[0] ?? name);
+        localStorage.setItem(storageKeyForAccount(cloudAccount, "cellar-profile-cellar-name"), `${name.split(" ")[0] || name}'s Cellar`);
+        localStorage.setItem(storageKeyForAccount(cloudAccount, "cellar-profile-currency"), profileCurrency);
+        loadCellarData(cloudAccount);
+        await syncCloudBottles(collectionBottles, cloudAccount, session);
+        resetAuthForm();
+        setAccountStatus(`Signed in as ${name}. Your shared cellar is now cloud-backed.`);
+      } catch (error) {
+        console.error("Supabase sign up failed:", error);
+        setAccountStatus("Could not create the cloud account. Check Supabase Auth settings and table policies.");
+      }
       return;
     }
     if (accounts.some((account) => account.email === email)) {
@@ -745,9 +923,40 @@ export default function Home() {
     setAccountStatus(`Signed in as ${name}. This account now owns the shared cellar on this device.`);
   }
 
-  function signInAccount() {
+  async function signInAccount() {
     const email = accountEmail.trim().toLowerCase();
     const password = accountPassword;
+    if (hasSupabaseConfig) {
+      if (!email || !password) {
+        setAccountStatus("Enter your email and password.");
+        return;
+      }
+      setAccountStatus("Signing in to your shared cellar...");
+      try {
+        const session = await supabaseRequest<SupabaseSession>(
+          "/auth/v1/token?grant_type=password",
+          {
+            method: "POST",
+            body: JSON.stringify({ email, password })
+          },
+          supabaseAnonKey
+        );
+        const cellarId = await ensureCloudCellar(session, session.user.user_metadata?.name || email);
+        const cloudAccount = accountFromSession(session, cellarId);
+        setSupabaseSession(session);
+        setCurrentAccount(cloudAccount);
+        localStorage.setItem(supabaseSessionStorageKey, JSON.stringify(session));
+        localStorage.setItem(sessionStorageKey, cloudAccount.id);
+        loadCellarData(cloudAccount);
+        await loadCloudBottles(session, cloudAccount);
+        resetAuthForm();
+        setAccountStatus(`Signed in to ${cloudAccount.name}'s shared cellar.`);
+      } catch (error) {
+        console.error("Supabase sign in failed:", error);
+        setAccountStatus("Email or password did not match a Supabase account.");
+      }
+      return;
+    }
     const account = accounts.find((item) => item.email === email && item.password === password);
     if (!account) {
       setAccountStatus("Email or password did not match an account.");
@@ -760,8 +969,17 @@ export default function Home() {
     setAccountStatus(`Signed in to ${account.name}'s shared cellar.`);
   }
 
-  function signOutAccount() {
+  async function signOutAccount() {
+    if (supabaseSession) {
+      await supabaseRequest(
+        "/auth/v1/logout",
+        { method: "POST" },
+        supabaseSession.access_token
+      ).catch(() => undefined);
+    }
+    localStorage.removeItem(supabaseSessionStorageKey);
     localStorage.removeItem(sessionStorageKey);
+    setSupabaseSession(null);
     setCurrentAccount(null);
     loadCellarData(null);
     setAccountStatus("Signed out. Sign in again to access the shared cellar.");
@@ -836,6 +1054,10 @@ export default function Home() {
     } catch {
       setCollectionBottles(next);
     }
+    void syncCloudBottles(next).catch((error) => {
+      console.error("Cellar cloud sync failed:", error);
+      setAccountStatus("Saved on this device, but cloud sync failed. Check Supabase policies.");
+    });
   }
 
   async function enrichScannedBottleWithResearch(bottle: CollectionBottle, intent: "collection" | "checking") {
@@ -885,6 +1107,9 @@ export default function Home() {
           } catch {
             // Keep the in-memory update even if local storage is full.
           }
+          void syncCloudBottles(next).catch((error) => {
+            console.error("Cellar cloud research sync failed:", error);
+          });
         }
         return next;
       });
@@ -975,16 +1200,12 @@ export default function Home() {
   function saveResearchedBottle() {
     if (researchIndex < 0 && !recognizedBottle) return;
     addBottleToCollection(researchedBottle);
+    refreshIdentification();
   }
 
   function deleteBottle(key: string) {
     const next = collectionBottles.filter((bottle) => `${bottle.producer}-${bottle.vintage}` !== key);
-    setCollectionBottles(next);
-    try {
-      localStorage.setItem(scopedStorageKey("cellar-collection-bottles-v2"), JSON.stringify(next));
-    } catch {
-      setCollectionBottles(next);
-    }
+    persistCollection(next);
   }
 
   function getSommelierReply(question: string) {
@@ -993,6 +1214,11 @@ export default function Home() {
     const red = collectionBottles.find((bottle) => /pinot noir|cabernet|nebbiolo|syrah|merlot/i.test(`${bottle.grapes} ${bottle.wine}`));
     const bottle = collectionBottles[0];
 
+    if (/pair with a meal|pair a meal|meal pairing/.test(query)) {
+      return collectionBottles.length
+        ? "Tell me what you are making, how it is prepared, and whether you want something classic or adventurous. I will choose the best options from your cellar."
+        : "Tell me what you are making and I can recommend the style to look for. Once bottles are in your cellar, I will choose exact bottles.";
+    }
     if (/duck|lamb|beef|steak/.test(query)) {
       return red
         ? `Open your ${red.vintage} ${red.producer} ${red.wine}. Serve it ${red.service}; its ${red.window.toLowerCase()} profile should suit the richness of the dish.`
@@ -1036,6 +1262,86 @@ export default function Home() {
       window.history.pushState(null, "", hash || window.location.pathname);
     }
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+  }
+
+  if (!authReady) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-cellar-cream px-4 text-cellar-ink">
+        <div className="text-center">
+          <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Cellar</p>
+          <h1 className="mt-3 font-serif text-4xl">Opening your cellar...</h1>
+        </div>
+      </main>
+    );
+  }
+
+  if (!currentAccount) {
+    return (
+      <main className="relative grid min-h-screen place-items-center overflow-hidden bg-cellar-night px-4 py-10 text-cellar-cream">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(199,162,90,.22),transparent_30%),linear-gradient(180deg,#2a1118,#130b0d)]" />
+        <div className="absolute inset-x-8 bottom-0 top-28 rounded-t-full border border-cellar-gold/18 bg-[linear-gradient(90deg,rgba(75,48,41,.42),rgba(23,18,17,.16),rgba(75,48,41,.42))]" />
+        <section className="relative w-full max-w-xl rounded-lg border border-cellar-gold/20 bg-cellar-parchment p-6 text-cellar-ink shadow-cellar sm:p-8">
+          <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Cellar</p>
+          <h1 className="mt-3 font-serif text-4xl">Sign in to your cellar</h1>
+          <p className="mt-3 leading-7 text-cellar-walnut">
+            Create your profile or sign in before entering your shared collection.
+          </p>
+          <form
+            className="mt-6 grid gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (authMode === "create") void createAccount();
+              else void signInAccount();
+            }}
+          >
+            {authMode === "create" && (
+              <input
+                className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+                value={accountName}
+                onChange={(event) => setAccountName(event.target.value)}
+                placeholder="Name"
+                autoComplete="name"
+                aria-label="Account name"
+              />
+            )}
+            <input
+              className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+              value={accountEmail}
+              onChange={(event) => setAccountEmail(event.target.value)}
+              placeholder="Email"
+              autoComplete="email"
+              type="email"
+              aria-label="Account email"
+            />
+            <input
+              className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+              value={accountPassword}
+              onChange={(event) => setAccountPassword(event.target.value)}
+              placeholder="Password"
+              autoComplete={authMode === "create" ? "new-password" : "current-password"}
+              type="password"
+              aria-label="Account password"
+            />
+            <button className="rounded-md bg-burgundy-700 px-5 py-3 text-sm font-medium text-white" type="submit">
+              {authMode === "create" ? "Create profile and enter" : "Sign in"}
+            </button>
+          </form>
+          <button
+            className="mt-4 text-sm font-medium text-burgundy-700"
+            onClick={() => {
+              setAuthMode((mode) => mode === "create" ? "signin" : "create");
+              setAccountStatus("");
+            }}
+            type="button"
+          >
+            {authMode === "create" ? "Already have an account? Sign in" : "Need an account? Create one"}
+          </button>
+          <p className="mt-4 min-h-5 text-sm text-cellar-walnut" role="status">
+            {accountStatus || (hasSupabaseConfig ? "Cloud sign-in is active." : "Local preview sign-in is active.")}
+          </p>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -1260,7 +1566,7 @@ export default function Home() {
                 </button>
               </form>
               <div className="mt-2 flex flex-wrap gap-2">
-                {["What pairs with duck?", "What should I open tonight?", "Which wines should I keep aging?"].map((prompt) => (
+                {["Pair with a meal", "What should I open tonight?", "Which wines should I keep aging?"].map((prompt) => (
                   <button className="rounded-full border border-white/20 px-3 py-2 text-xs text-cellar-cream" key={prompt} onClick={() => sendSommelierMessage(prompt)}>
                     {prompt}
                   </button>
@@ -1798,7 +2104,7 @@ export default function Home() {
               </button>
             </form>
             <div className="mt-3 flex flex-wrap gap-2">
-              {["What pairs with duck?", "What should I open tonight?", "Which wines should I keep aging?"].map((prompt) => (
+              {["Pair with a meal", "What should I open tonight?", "Which wines should I keep aging?"].map((prompt) => (
                 <button className="rounded-full border border-white/20 px-3 py-2 text-xs text-cellar-cream" key={prompt} onClick={() => sendSommelierMessage(prompt)}>
                   {prompt}
                 </button>
@@ -1828,7 +2134,7 @@ export default function Home() {
               {currentAccount && (
                 <button
                   className="inline-flex items-center justify-center gap-2 rounded-md border border-cellar-oak/25 px-4 py-2 text-sm font-medium text-burgundy-700"
-                  onClick={signOutAccount}
+                  onClick={() => void signOutAccount()}
                   type="button"
                 >
                   <LogOut className="size-4" aria-hidden />
@@ -1856,8 +2162,8 @@ export default function Home() {
                 className="mt-5 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  if (authMode === "create") createAccount();
-                  else signInAccount();
+                  if (authMode === "create") void createAccount();
+                  else void signInAccount();
                 }}
               >
                 {authMode === "create" && (
@@ -1906,7 +2212,9 @@ export default function Home() {
               </button>
             )}
             <p className="mt-3 min-h-5 text-sm text-cellar-walnut" role="status">
-              {accountStatus || (currentAccount ? "This browser is using the shared cellar account." : "Accounts are saved locally until Supabase authentication is connected.")}
+              {accountStatus || (currentAccount
+                ? hasSupabaseConfig ? "Cloud sharing is active for this cellar." : "This browser is using the shared cellar account."
+                : hasSupabaseConfig ? "Create or sign in to a Supabase account to share this cellar across devices." : "Accounts are saved locally until Supabase authentication is connected.")}
             </p>
           </section>
           <form
@@ -2183,19 +2491,23 @@ function DigitalBottle({ bottle }: { bottle: CollectionBottle }) {
 
   return (
     <div className="relative grid place-items-center">
-      <div className="absolute bottom-1 h-5 w-24 rounded-full bg-black/20 blur-md transition duration-500 group-hover:scale-110" />
-      <div className="relative h-64 w-24 origin-bottom transition duration-500 group-hover:-translate-y-2 group-hover:rotate-[-2deg]">
-        <div className={`absolute left-1/2 top-0 h-12 w-8 -translate-x-1/2 rounded-t-full bg-gradient-to-r ${glassClass} shadow-inner`} />
-        <div className={`absolute left-1/2 top-9 h-7 w-12 -translate-x-1/2 rounded-t-xl bg-gradient-to-r ${glassClass}`} />
-        <div className={`absolute bottom-0 left-1/2 h-52 w-24 -translate-x-1/2 overflow-hidden rounded-t-[2rem] rounded-b-xl bg-gradient-to-r ${glassClass} shadow-[inset_12px_0_18px_rgba(255,255,255,.11),inset_-14px_0_20px_rgba(0,0,0,.42),0_18px_28px_rgba(32,23,21,.24)]`}>
-          <div className="absolute left-4 top-4 h-44 w-3 rounded-full bg-white/18 blur-sm transition duration-500 group-hover:translate-x-1" />
-          <div className={`absolute left-2 right-2 top-20 rounded-md border px-2 py-3 text-center shadow-soft ${labelTint}`}>
+      <div className="absolute bottom-0 h-5 w-28 rounded-full bg-black/20 blur-md transition duration-500 group-hover:scale-110" />
+      <div className="relative h-72 w-28 origin-bottom transition duration-500 group-hover:-translate-y-2 group-hover:rotate-[-2deg]">
+        <div className="absolute left-1/2 top-0 z-20 h-3 w-11 -translate-x-1/2 rounded-full bg-cellar-gold shadow-sm" />
+        <div className={`absolute left-1/2 top-2 z-10 h-20 w-9 -translate-x-1/2 rounded-t-md bg-gradient-to-r ${glassClass} shadow-[inset_8px_0_12px_rgba(255,255,255,.16),inset_-10px_0_16px_rgba(0,0,0,.38)]`} />
+        <div className="absolute left-1/2 top-7 z-20 h-10 w-10 -translate-x-1/2 rounded-sm border-y border-cellar-gold/35 bg-burgundy-700/80 shadow-sm" />
+        <div className={`absolute left-1/2 top-[70px] h-16 w-24 -translate-x-1/2 rounded-t-[48px] bg-gradient-to-r ${glassClass} shadow-[inset_10px_0_14px_rgba(255,255,255,.12),inset_-12px_0_16px_rgba(0,0,0,.38)]`} />
+        <div className={`absolute bottom-0 left-1/2 h-[190px] w-28 -translate-x-1/2 overflow-hidden rounded-t-[2.25rem] rounded-b-[1.1rem] bg-gradient-to-r ${glassClass} shadow-[inset_14px_0_20px_rgba(255,255,255,.12),inset_-18px_0_24px_rgba(0,0,0,.46),0_20px_30px_rgba(32,23,21,.24)]`}>
+          <div className="absolute left-4 top-3 h-44 w-3 rounded-full bg-white/18 blur-sm transition duration-500 group-hover:translate-x-1" />
+          <div className="absolute bottom-3 left-1/2 h-5 w-14 -translate-x-1/2 rounded-full border border-white/10 bg-black/22" />
+          <div className={`absolute left-2 right-2 top-16 rounded-sm border px-2 py-3 text-center shadow-soft ${labelTint}`}>
             <p className="truncate text-[9px] uppercase tracking-[0.16em] text-burgundy-900">{bottle.producer}</p>
             <p className="mt-1 font-serif text-lg leading-none text-cellar-ink">{bottle.vintage}</p>
             <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-3 text-cellar-ink">{bottle.wine}</p>
             <p className="mt-2 truncate text-[8px] uppercase tracking-[0.12em] text-cellar-walnut">{bottle.appellation}</p>
             <p className="mt-1 text-[8px] font-semibold text-burgundy-700">{type}</p>
           </div>
+          <div className="absolute left-3 right-3 top-[148px] h-px bg-cellar-gold/35" />
           <div className="absolute inset-0 translate-x-[-120%] bg-gradient-to-r from-transparent via-white/18 to-transparent transition duration-700 group-hover:translate-x-[120%]" />
         </div>
       </div>

@@ -141,6 +141,17 @@ function providerFromUrl(url: string) {
   }
 }
 
+function sanitizeMarketPriceRange(range: string) {
+  if (!range || /research|pending|not enough|not publicly/i.test(range)) return range;
+  const amounts = [...range.matchAll(/([\d,]+(?:\.\d+)?)/g)]
+    .map((match) => Number(match[1].replace(/,/g, "")))
+    .filter((amount) => Number.isFinite(amount) && amount > 0 && amount < 50000);
+  const looksLikeBrokenRange = /(?:[$£€]\s*(?:-|to)|(?:-|to)\s*[$£€])/i.test(range) && amounts.length < 2;
+  if (looksLikeBrokenRange || !amounts.length) return "Not enough current listings";
+  if (amounts.length === 1 && /(?:-|to)/i.test(range)) return "Not enough current listings";
+  return range;
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -176,9 +187,12 @@ export async function POST(request: Request) {
     "Paraphrase tasting notes briefly. Do not reproduce long critic or community reviews.",
     "Return 10 to 16 concise one- or two-word aroma and flavor descriptors in tastingNotes.",
     "Label every critic score with its source. Keep community ratings separate from professional scores.",
-    "Find current retail listings for one standard 750 ml bottle of the exact wine and vintage, prioritizing UK merchants and GBP prices. Return a concise low-to-high per-bottle range such as '£45-£65 per 750 ml bottle' in marketPriceRange.",
-    "Exclude auction lots, restaurant lists, mixed cases, and other vintages. If fewer than two comparable exact-vintage retail listings are available, say 'Not enough current listings' and explain that in marketPriceNote.",
-    "In marketPriceNote, briefly state the number and kind of comparable listings used, that prices may exclude delivery or tax where applicable, and the date-sensitive nature of the estimate.",
+    "Find current retail listings for one standard 750 ml bottle of the exact wine and vintage, prioritizing UK merchants and GBP prices, then international merchants only if exact UK listings are not available.",
+    "Use only same-bottle-size retail prices. Exclude auction lots, restaurant lists, mixed cases, duty-in-bond unless clearly stated as bottle price, unrelated cuvees, and other vintages.",
+    "Return marketPriceRange only when you have a real low price and high price from comparable listings. Use this exact format: '£45-£65 per 750 ml bottle'. Never return a missing bound such as '$ to $968'.",
+    "If fewer than two comparable exact-vintage retail listings are available, set marketPriceRange to 'Not enough current listings' and explain that in marketPriceNote.",
+    "Sanity-check the range against the producer, appellation, vintage, and wine style. If one listing is an obvious outlier, exclude it and say so in marketPriceNote.",
+    "In marketPriceNote, briefly state the number and kind of comparable listings used, the currency, that prices may exclude delivery or tax where applicable, and the date-sensitive nature of the estimate.",
     "Build the drink window from cited exact-vintage evidence when available; otherwise provide a conservative estimate and clearly say it is a sommelier estimate.",
     "Use community pairing recommendations when they are actually found. Put your own wine-knowledge suggestions only in sommelierPairings.",
     "Include direct source URLs for every factual rating, note, price, or window used."
@@ -266,6 +280,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ...research,
+    marketPriceRange: sanitizeMarketPriceRange(research.marketPriceRange),
     sources: mergedSources,
     researchedAt: new Date().toISOString()
   });
