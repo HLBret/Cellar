@@ -1576,6 +1576,11 @@
         return `${formatCurrencyAmount(Math.min(...converted), activeCurrency)}-${formatCurrencyAmount(Math.max(...converted), activeCurrency)} ${suffix}`;
       }
 
+      function bottleQuantity(wine) {
+        if (wine.status === "Opened") return 0;
+        return Number.parseInt(wine.quantity, 10) || 0;
+      }
+
       async function loadExchangeRates() {
         try {
           const response = await fetch("https://api.frankfurter.app/latest?from=GBP&to=USD,EUR");
@@ -1943,8 +1948,24 @@
         refreshRecognition();
       }
 
+      function markBottleOpened(key) {
+        const index = collectionBottles.findIndex((wine) => `${wine.producer}-${wine.vintage}` === key);
+        if (index < 0) return;
+        const quantity = bottleQuantity(collectionBottles[index]);
+        if (quantity > 1) {
+          collectionBottles[index].quantity = `${quantity - 1} ${quantity - 1 === 1 ? "bottle" : "bottles"}`;
+        } else {
+          collectionBottles[index].quantity = "0 bottles";
+          collectionBottles[index].status = "Opened";
+          collectionBottles[index].openedAt = new Date().toISOString();
+        }
+        persistCollection();
+        updateCollectionStats();
+        renderCollection();
+      }
+
       function updateCollectionStats() {
-        collectionTotal = collectionBottles.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+        collectionTotal = collectionBottles.reduce((total, wine) => total + bottleQuantity(wine), 0);
         const ready = collectionBottles.filter((wine) => /peak/i.test(wine.maturity)).length;
         const regions = new Set(collectionBottles.map((wine) => wine.region));
         collectionTotalLabel.textContent = collectionTotal;
@@ -1953,9 +1974,9 @@
         document.getElementById("stat-resting").textContent = Math.max(collectionTotal - ready, 0);
         document.getElementById("stat-regions").textContent = regions.size;
         document.getElementById("overview-total").textContent = collectionTotal;
-        document.getElementById("overview-red").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "Red").reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
-        document.getElementById("overview-white").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "White").reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
-        document.getElementById("overview-sparkling").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "Sparkling").reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0);
+        document.getElementById("overview-red").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "Red").reduce((total, wine) => total + bottleQuantity(wine), 0);
+        document.getElementById("overview-white").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "White").reduce((total, wine) => total + bottleQuantity(wine), 0);
+        document.getElementById("overview-sparkling").textContent = collectionBottles.filter((wine) => wineTypeForBottle(wine) === "Sparkling").reduce((total, wine) => total + bottleQuantity(wine), 0);
         document.getElementById("overview-cellar-bottles").textContent = collectionTotal;
         showProfile(activeTonightProfile);
         updateCollectionRegionOptions();
@@ -2022,7 +2043,7 @@
                 <div class="wine-card-producer">${wine.producer}</div>
                 <h3>${wine.wine}</h3>
                 <p class="wine-card-meta">${regionLabel(wine.region)} / ${wine.grapes}</p>
-                <div class="wine-note-pills"><span>${wineTypeForBottle(wine)}</span><span>${wine.maturity}</span><span>${wine.quantity}</span></div>
+                <div class="wine-note-pills"><span>${wineTypeForBottle(wine)}</span><span>${wine.maturity}</span><span>${wine.quantity}</span>${wine.status === "Opened" ? "<span>Opened</span>" : ""}</div>
                 <p class="wine-card-note">${wine.appellation}</p>
                 <div class="wine-price-pill">Per-bottle price range: ${displayPriceRange(wine.priceRange || wine.market)}</div>
                 <div class="wine-note-pills">${(wine.tastingNotes || [wine.classification]).slice(0, 5).map((note) => `<span>${note}</span>`).join("")}</div>
@@ -2031,7 +2052,8 @@
             <div class="wine-card-foot">
               <p>Stored in ${wine.storage}<br>Drink ${wine.window}</p>
               <div class="wine-card-actions">
-                <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Per-bottle price range ${displayPriceRange(wine.priceRange || wine.market)}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
+                ${wine.status === "Opened" ? "" : `<button data-open-key="${wine.producer}-${wine.vintage}">Open</button>`}
+                <button data-action="${wine.vintage} ${wine.producer}" data-copy="${wine.wine}. ${wine.note} ${wine.grapes}; ${wine.appellation}. Per-bottle price range ${displayPriceRange(wine.priceRange || wine.market)}. Drinking window ${wine.window}. Stored at ${wine.storage}. You own ${wine.quantity}. Serve ${wine.service}. ${wine.status === "Opened" ? `Opened ${wine.openedAt ? new Date(wine.openedAt).toLocaleDateString() : ""}.` : ""} ${wine.producerHistory || ""} ${wine.vintageSummary || ""} ${wine.foodPairing ? `Pairing: ${wine.foodPairing}` : ""}">Full details</button>
                 <button class="delete-bottle" data-delete-key="${wine.producer}-${wine.vintage}" data-delete-title="${wine.vintage} ${wine.producer}" data-delete-copy="This will remove ${wine.quantity} of ${wine.wine} from your collection. This action cannot be undone." aria-label="Delete ${wine.vintage} ${wine.producer}">Delete</button>
                 </div>
               </div>
@@ -2043,6 +2065,9 @@
         collectionGrid.querySelectorAll("[data-action]").forEach((control) => {
           control.addEventListener("click", () => openActionModal(control.dataset.action, control.dataset.copy));
           control.dataset.bound = "true";
+        });
+        collectionGrid.querySelectorAll("[data-open-key]").forEach((control) => {
+          control.addEventListener("click", () => markBottleOpened(control.dataset.openKey));
         });
         collectionGrid.querySelectorAll("[data-delete-key]").forEach((control) => {
           control.addEventListener("click", () => openDeleteModal(control.dataset.deleteKey, control.dataset.deleteTitle, control.dataset.deleteCopy));

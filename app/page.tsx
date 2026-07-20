@@ -80,6 +80,8 @@ type CollectionBottle = {
   window: string;
   drinkingWindow: string;
   quantity: string;
+  status?: "Cellared" | "Opened";
+  openedAt?: string;
   purchase: string;
   market: string;
   priceRange?: string;
@@ -402,6 +404,11 @@ function displayPriceRange(priceRange: string | undefined, currency: CurrencyCod
   return `${formatCurrencyAmount(Math.min(...converted), currency)}-${formatCurrencyAmount(Math.max(...converted), currency)} ${suffix}`;
 }
 
+function bottleQuantity(bottle: Pick<CollectionBottle, "quantity" | "status">) {
+  if (bottle.status === "Opened") return 0;
+  return Number.parseInt(bottle.quantity, 10) || 0;
+}
+
 function wineTypeForBottle(bottle: CollectionBottle) {
   const text = `${bottle.style ?? ""} ${bottle.classification} ${bottle.wine} ${bottle.grapes} ${bottle.appellation}`.toLowerCase();
   if (/sparkling|champagne|prosecco|cava|franciacorta|pet[- ]?nat|crémant|cremant/.test(text)) return "Sparkling";
@@ -480,10 +487,10 @@ export default function Home() {
   const recommendationService = recommendedBottle
     ? [...recommendedBottle.service.split("/").map((item) => item.trim()), recommendedBottle.drinkingWindow]
     : ["No bottle", "No service", "No window"];
-  const collectionTotal = collectionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+  const collectionTotal = collectionBottles.reduce((total, bottle) => total + bottleQuantity(bottle), 0);
   const typeCount = (type: string) => collectionBottles
     .filter((bottle) => wineTypeForBottle(bottle) === type)
-    .reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+    .reduce((total, bottle) => total + bottleQuantity(bottle), 0);
   const grapeOptions = Array.from(new Set(collectionBottles.flatMap((bottle) =>
     bottle.grapes
       .split(/,|\/|\+| and /i)
@@ -534,7 +541,7 @@ export default function Home() {
     [String(new Set(collectionBottles.map((bottle) => bottle.region)).size), "Regions"]
   ];
   const selectedRegionBottles = activeMapRegion ? collectionBottles.filter((bottle) => regionLabel(bottle.region) === activeMapRegion) : [];
-  const selectedRegionTotal = selectedRegionBottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+  const selectedRegionTotal = selectedRegionBottles.reduce((total, bottle) => total + bottleQuantity(bottle), 0);
   const selectedRegionReady = selectedRegionBottles.filter((bottle) => /peak/i.test(bottle.window)).length;
   const selectedRegionScore = selectedRegionBottles.length
     ? (selectedRegionBottles.reduce((total, bottle) => total + Number(bottle.score), 0) / selectedRegionBottles.length).toFixed(1)
@@ -584,6 +591,20 @@ export default function Home() {
     if (existingMemberships[0]?.cellar_id) return existingMemberships[0].cellar_id;
 
     const cellarNameValue = `${displayName.split(" ")[0] || displayName}'s Cellar`;
+    try {
+      const rpcCellarId = await supabaseRequest<string>(
+        "/rest/v1/rpc/create_cellar_for_current_user",
+        {
+          method: "POST",
+          body: JSON.stringify({ cellar_name: cellarNameValue })
+        },
+        session.access_token
+      );
+      if (rpcCellarId) return rpcCellarId;
+    } catch (error) {
+      console.warn("Cellar RPC creation unavailable, falling back to direct insert:", error);
+    }
+
     const createdCellars = await supabaseRequest<Array<{ id: string }>>(
       "/rest/v1/cellars?select=id",
       {
@@ -1251,6 +1272,29 @@ export default function Home() {
   function deleteBottle(key: string) {
     const next = collectionBottles.filter((bottle) => `${bottle.producer}-${bottle.vintage}` !== key);
     persistCollection(next);
+  }
+
+  function markBottleOpened(target: CollectionBottle) {
+    const key = `${target.producer}-${target.vintage}`;
+    const openedAt = new Date().toISOString();
+    const next = collectionBottles.map((bottle) => {
+      if (`${bottle.producer}-${bottle.vintage}` !== key) return bottle;
+      const quantity = bottleQuantity(bottle);
+      if (quantity > 1) {
+        return { ...bottle, quantity: `${quantity - 1} ${quantity - 1 === 1 ? "bottle" : "bottles"}` };
+      }
+      return { ...bottle, quantity: "0 bottles", status: "Opened" as const, openedAt };
+    });
+    persistCollection(next);
+    setActiveBottle((current) => {
+      if (!current || `${current.producer}-${current.vintage}` !== key) return current;
+      const updated = next.find((bottle) => `${bottle.producer}-${bottle.vintage}` === key);
+      return updated ?? current;
+    });
+    showDialog(
+      "Bottle marked opened",
+      `${target.vintage} ${target.producer} ${target.wine} has been marked as opened.`
+    );
   }
 
   function getSommelierReply(question: string) {
@@ -1959,6 +2003,7 @@ export default function Home() {
                             <span className="rounded-full bg-burgundy-50 px-3 py-1 text-xs font-semibold text-burgundy-900">{wineTypeForBottle(bottle)}</span>
                             <span className="rounded-full bg-cellar-parchment px-3 py-1 text-xs font-semibold text-cellar-walnut">{bottle.window}</span>
                             <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold text-cellar-walnut">{bottle.quantity}</span>
+                            {bottle.status === "Opened" && <span className="rounded-full bg-burgundy-700 px-3 py-1 text-xs font-semibold text-white">Opened</span>}
                           </div>
                           <p className="mt-4 line-clamp-2 text-sm leading-6 text-cellar-walnut">{bottle.appellation} / {bottle.grapes}</p>
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -1975,6 +2020,14 @@ export default function Home() {
                       <div className="flex items-center justify-between gap-3 border-t border-cellar-oak/15 p-4">
                         <p className="text-xs leading-5 text-cellar-walnut">Stored in {bottle.cellar}<br />Drink {bottle.drinkingWindow}</p>
                         <div className="flex shrink-0 gap-2">
+                          {bottle.status !== "Opened" && (
+                            <button
+                              className="rounded-md border border-cellar-oak/25 px-4 py-2 text-sm font-medium text-burgundy-700 transition hover:bg-burgundy-50"
+                              onClick={() => markBottleOpened(bottle)}
+                            >
+                              Open
+                            </button>
+                          )}
                           <button
                             className="rounded-md bg-cellar-ink px-4 py-2 text-sm font-medium text-white"
                             onClick={() => void openBottleDetails(bottle)}
@@ -2024,7 +2077,7 @@ export default function Home() {
                   <path fill="#536a56" d="m786 344 88 16 49 53-35 43-104-16-31-55z" />
                 </svg>
                 {mapRegions.length ? mapRegions.map(({ region, bottles, position }) => {
-                  const regionCount = bottles.reduce((total, bottle) => total + Number.parseInt(bottle.quantity, 10), 0);
+                  const regionCount = bottles.reduce((total, bottle) => total + bottleQuantity(bottle), 0);
                   return (
                   <button
                     className={`absolute min-w-24 -translate-x-1/2 -translate-y-1/2 rounded-md border px-3 py-2 text-left text-xs font-medium shadow-soft transition ${activeMapRegion === region ? "border-cellar-gold bg-white text-burgundy-900 ring-2 ring-cellar-gold" : "border-white/20 bg-cellar-gold text-cellar-ink hover:bg-white"}`}
@@ -2316,6 +2369,9 @@ export default function Home() {
                   <span className="rounded-md bg-burgundy-50 px-2 py-1 text-xs font-medium text-burgundy-900">
                     {activeBottle.research?.wineColor || activeBottle.style || "Wine color not confirmed"}
                   </span>
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${activeBottle.status === "Opened" ? "bg-burgundy-700 text-white" : "bg-cellar-gold/20 text-burgundy-900"}`}>
+                    {activeBottle.status === "Opened" ? `Opened ${activeBottle.openedAt ? new Date(activeBottle.openedAt).toLocaleDateString() : ""}` : `${activeBottle.quantity} cellared`}
+                  </span>
                 </div>
                 <h2 className="mt-2 font-serif text-3xl sm:text-4xl" id="wine-detail-title">{activeBottle.producer}</h2>
                 <p className="mt-1 text-lg text-cellar-walnut">{activeBottle.wine}</p>
@@ -2330,14 +2386,24 @@ export default function Home() {
                 <p className="max-w-3xl leading-7 text-cellar-walnut">
                   {activeBottle.research?.summary ?? activeBottle.note}
                 </p>
-                <button
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-burgundy-700 px-4 py-3 text-sm font-medium text-white disabled:opacity-55"
-                  disabled={isResearchingBottle}
-                  onClick={() => void openBottleDetails(activeBottle)}
-                >
-                  <RefreshCw className={`size-4 ${isResearchingBottle ? "animate-spin" : ""}`} aria-hidden />
-                  {isResearchingBottle ? "Researching" : "Refresh research"}
-                </button>
+                <div className="grid shrink-0 gap-2 sm:grid-cols-2">
+                  {activeBottle.status !== "Opened" && (
+                    <button
+                      className="inline-flex items-center justify-center rounded-md bg-cellar-ink px-4 py-3 text-sm font-medium text-white"
+                      onClick={() => markBottleOpened(activeBottle)}
+                    >
+                      Mark opened
+                    </button>
+                  )}
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-burgundy-700 px-4 py-3 text-sm font-medium text-white disabled:opacity-55"
+                    disabled={isResearchingBottle}
+                    onClick={() => void openBottleDetails(activeBottle)}
+                  >
+                    <RefreshCw className={`size-4 ${isResearchingBottle ? "animate-spin" : ""}`} aria-hidden />
+                    {isResearchingBottle ? "Researching" : "Refresh research"}
+                  </button>
+                </div>
               </div>
 
               {bottleResearchError && (
