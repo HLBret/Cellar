@@ -478,6 +478,8 @@ export default function Home() {
   const [accountStatus, setAccountStatus] = useState("");
   const [supabaseSession, setSupabaseSession] = useState<SupabaseSession | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [isRefreshingCollection, setIsRefreshingCollection] = useState(false);
+  const [collectionSyncStatus, setCollectionSyncStatus] = useState("");
   const researchedBottle = recognizedBottle ?? researchedWines[Math.max(researchIndex, 0)];
   const tonight = liveTonight ?? {
     label: "",
@@ -686,6 +688,25 @@ export default function Home() {
     localStorage.setItem(storageKeyForAccount(account, "cellar-collection-bottles-v2"), JSON.stringify(savedBottles));
   }
 
+  async function refreshCloudCollection(message = true) {
+    if (!currentAccount?.cellarId || !supabaseSession) {
+      if (message) setCollectionSyncStatus("Sign in to refresh the shared cellar.");
+      return;
+    }
+    setIsRefreshingCollection(true);
+    try {
+      const bottles = await loadCloudBottles(supabaseSession, currentAccount);
+      if (message) {
+        setCollectionSyncStatus(`Synced ${bottles.length} bottle record${bottles.length === 1 ? "" : "s"} from Supabase.`);
+      }
+    } catch (error) {
+      console.error("Cellar cloud refresh failed:", error);
+      if (message) setCollectionSyncStatus("Could not refresh from Supabase. Try again.");
+    } finally {
+      setIsRefreshingCollection(false);
+    }
+  }
+
   function accountFromSession(session: SupabaseSession, cellarId?: string): CellarAccount {
     const name = session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Cellar user";
     return {
@@ -811,6 +832,24 @@ export default function Home() {
     }
     void loadExchangeRates();
   }, []);
+
+  useEffect(() => {
+    if (!currentAccount?.cellarId || !supabaseSession) return;
+    const refreshSilently = () => {
+      if (document.visibilityState === "visible") void refreshCloudCollection(false);
+    };
+    const refreshOnFocus = () => void refreshCloudCollection(false);
+    document.addEventListener("visibilitychange", refreshSilently);
+    window.addEventListener("focus", refreshOnFocus);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshCloudCollection(false);
+    }, 45000);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshSilently);
+      window.removeEventListener("focus", refreshOnFocus);
+      window.clearInterval(interval);
+    };
+  }, [currentAccount?.cellarId, supabaseSession?.access_token]);
 
   useEffect(() => {
     if (!mapRegions.length) {
@@ -1295,6 +1334,47 @@ export default function Home() {
       "Bottle marked opened",
       `${target.vintage} ${target.producer} ${target.wine} has been marked as opened.`
     );
+  }
+
+  function exportCellarBackup() {
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      cellarName,
+      bottles: collectionBottles,
+      checkedBottles
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `cellar-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setProfileStatus(`Exported ${collectionBottles.length} bottle record${collectionBottles.length === 1 ? "" : "s"}.`);
+  }
+
+  async function importCellarBackup(file: File | null) {
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text()) as { bottles?: CollectionBottle[]; collectionBottles?: CollectionBottle[] } | CollectionBottle[];
+      const imported = Array.isArray(parsed) ? parsed : parsed.bottles ?? parsed.collectionBottles ?? [];
+      if (!Array.isArray(imported) || !imported.length) {
+        setProfileStatus("No bottles were found in that backup file.");
+        return;
+      }
+      const merged = new Map<string, CollectionBottle>();
+      [...collectionBottles, ...imported].forEach((bottle) => {
+        if (!bottle?.producer || !bottle?.wine || !bottle?.vintage) return;
+        const key = `${bottle.producer}-${bottle.wine}-${bottle.vintage}`;
+        const { cloudId, ...restoredBottle } = bottle;
+        merged.set(key, { ...restoredBottle, cellar: restoredBottle.cellar || cellarName });
+      });
+      const next = Array.from(merged.values());
+      persistCollection(next);
+      setProfileStatus(`Imported ${imported.length} bottle record${imported.length === 1 ? "" : "s"} and saved ${next.length} total.`);
+    } catch {
+      setProfileStatus("That backup file could not be imported.");
+    }
   }
 
   function getSommelierReply(question: string) {
@@ -1930,8 +2010,9 @@ export default function Home() {
               <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">My bottles / {collectionTotal} total</p>
               <h2 className="mt-2 font-serif text-4xl">Your complete collection</h2>
               <p className="mt-2 text-cellar-walnut">Detailed cards for every vintage, bottle, and storage location.</p>
+              {collectionSyncStatus && <p className="mt-2 text-sm font-medium text-cellar-walnut" role="status">{collectionSyncStatus}</p>}
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.2fr)_140px_130px_150px_150px_140px_140px]">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.2fr)_140px_130px_150px_150px_140px_140px_auto]">
               <label className="flex items-center gap-2 rounded-md border border-cellar-oak/20 bg-white/75 px-3 py-2">
                 <Search className="size-4 text-burgundy-700" aria-hidden />
                 <span className="sr-only">Search collection</span>
@@ -1963,6 +2044,15 @@ export default function Home() {
                 <option value="score">Highest score</option>
                 <option value="vintage">Newest vintage</option>
               </select>
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-cellar-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-55"
+                disabled={isRefreshingCollection}
+                onClick={() => void refreshCloudCollection(true)}
+                type="button"
+              >
+                <RefreshCw className={`size-4 ${isRefreshingCollection ? "animate-spin" : ""}`} aria-hidden />
+                Sync
+              </button>
             </div>
           </div>
 
@@ -2350,6 +2440,34 @@ export default function Home() {
             <button className="rounded-md bg-burgundy-700 px-5 py-3 text-sm font-medium text-white" type="submit">Save profile</button>
           </form>
           <p className="mt-2 min-h-5 text-sm text-cellar-walnut" role="status">{profileStatus || `${exchangeStatus} Showing prices in ${currencyLabels[currency]}.`}</p>
+          <section className="mt-6 max-w-4xl rounded-lg border border-cellar-oak/20 bg-white/70 p-5 shadow-soft">
+            <p className="text-xs uppercase tracking-[0.16em] text-burgundy-700">Backup & transfer</p>
+            <h3 className="mt-2 font-serif text-2xl">Move bottles into this account</h3>
+            <p className="mt-2 text-sm leading-6 text-cellar-walnut">
+              Export a backup from the device or preview that still has your bottles, then import it here while signed in.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-md border border-cellar-oak/25 px-4 py-3 text-sm font-medium text-burgundy-700"
+                onClick={exportCellarBackup}
+                type="button"
+              >
+                Export cellar backup
+              </button>
+              <label className="cursor-pointer rounded-md bg-cellar-ink px-4 py-3 text-center text-sm font-medium text-white">
+                Import cellar backup
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(event) => {
+                    void importCellarBackup(event.target.files?.[0] ?? null);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          </section>
         </div>
       </section>
 

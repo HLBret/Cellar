@@ -1407,6 +1407,15 @@
           </select>
           <button type="submit">Save profile</button>
         </form>
+        <section class="account-panel" aria-label="Backup and transfer">
+          <div class="account-head">
+            <div>
+              <h3>Backup & transfer</h3>
+              <p>Export these local preview bottles, then import the file into the live signed-in app.</p>
+            </div>
+          </div>
+          <button class="account-signout" id="export-backup" type="button">Export cellar backup</button>
+        </section>
         <p class="profile-status" id="profile-status" role="status"></p>
       </section>
     </main>
@@ -2271,6 +2280,7 @@
       const welcomeHeading = document.getElementById("welcome-heading");
       const heroCellarName = document.getElementById("hero-cellar-name");
       const overviewCellarName = document.getElementById("overview-cellar-name");
+      const exportBackup = document.getElementById("export-backup");
       const accountForm = document.getElementById("account-form");
       const accountName = document.getElementById("account-name");
       const accountEmail = document.getElementById("account-email");
@@ -2384,6 +2394,22 @@
         localStorage.removeItem(sessionStorageKey);
         currentAccount = null;
         renderAccountPanel("Signed out. Sign in again to access the shared cellar.");
+      });
+      exportBackup.addEventListener("click", () => {
+        const backup = {
+          exportedAt: new Date().toISOString(),
+          cellarName: activeCellarName,
+          bottles: collectionBottles,
+          checkedBottles
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `cellar-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        profileStatus.textContent = `Exported ${collectionBottles.length} bottle record${collectionBottles.length === 1 ? "" : "s"}.`;
       });
       let activeCellarName = localStorage.getItem("cellar-profile-cellar-name") || "My Cellar";
       function applyCellarName(name) {
