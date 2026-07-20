@@ -23,6 +23,8 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  LogOut,
+  Users,
   Wine,
   RefreshCw,
   X
@@ -99,6 +101,20 @@ type CurrencyCode = "GBP" | "USD" | "EUR";
 type ViewId = "home" | "add-bottle" | "collection-overview" | "dashboard" | "my-collection" | "regional-map" | "sommelier" | "settings";
 
 type ExchangeRates = Record<CurrencyCode, number>;
+type CellarAccount = {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  createdAt: string;
+};
+
+const accountsStorageKey = "cellar-shared-accounts-v1";
+const sessionStorageKey = "cellar-active-account-v1";
+
+function storageKeyForAccount(account: CellarAccount | null, key: string) {
+  return account ? `cellar-account:${account.id}:${key}` : key;
+}
 
 const researchedWines: CollectionBottle[] = [
   {
@@ -417,6 +433,13 @@ export default function Home() {
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>(fallbackRates);
   const [exchangeStatus, setExchangeStatus] = useState("Using backup exchange rates.");
   const [profileStatus, setProfileStatus] = useState("");
+  const [accounts, setAccounts] = useState<CellarAccount[]>([]);
+  const [currentAccount, setCurrentAccount] = useState<CellarAccount | null>(null);
+  const [authMode, setAuthMode] = useState<"signin" | "create">("create");
+  const [accountName, setAccountName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountStatus, setAccountStatus] = useState("");
   const researchedBottle = recognizedBottle ?? researchedWines[Math.max(researchIndex, 0)];
   const tonight = liveTonight ?? {
     label: "",
@@ -489,6 +512,58 @@ export default function Home() {
     .slice()
     .sort((a, b) => Number(b.score) - Number(a.score))[0];
   const selectedRegionReadyBottles = selectedRegionBottles.filter((bottle) => /peak/i.test(bottle.window));
+  const scopedStorageKey = (key: string) => storageKeyForAccount(currentAccount, key);
+
+  function loadCellarData(account: CellarAccount | null) {
+    const collectionKey = storageKeyForAccount(account, "cellar-collection-bottles-v2");
+    const checksKey = storageKeyForAccount(account, "cellar-checked-bottles-v1");
+    const firstNameKey = storageKeyForAccount(account, "cellar-profile-first-name");
+    const cellarNameKey = storageKeyForAccount(account, "cellar-profile-cellar-name");
+    const currencyKey = storageKeyForAccount(account, "cellar-profile-currency");
+
+    try {
+      localStorage.removeItem("cellar-removed-bottles");
+      localStorage.removeItem("cellar-collection-bottles");
+      const saved = JSON.parse(localStorage.getItem(collectionKey) ?? "[]");
+      const legacy = account ? JSON.parse(localStorage.getItem("cellar-collection-bottles-v2") ?? "[]") : [];
+      const bottles = Array.isArray(saved) && saved.length ? saved : Array.isArray(legacy) ? legacy : [];
+      if (account && !localStorage.getItem(collectionKey) && bottles.length) {
+        localStorage.setItem(collectionKey, JSON.stringify(bottles));
+      }
+      setCollectionBottles(bottles);
+    } catch {
+      setCollectionBottles([]);
+    }
+    try {
+      const savedChecks = JSON.parse(localStorage.getItem(checksKey) ?? "[]");
+      const legacyChecks = account ? JSON.parse(localStorage.getItem("cellar-checked-bottles-v1") ?? "[]") : [];
+      const checks = Array.isArray(savedChecks) && savedChecks.length ? savedChecks : Array.isArray(legacyChecks) ? legacyChecks : [];
+      if (account && !localStorage.getItem(checksKey) && checks.length) {
+        localStorage.setItem(checksKey, JSON.stringify(checks));
+      }
+      setCheckedBottles(checks);
+    } catch {
+      setCheckedBottles([]);
+    }
+    try {
+      const savedFirstName = localStorage.getItem(firstNameKey) ?? "";
+      const savedCellarName = localStorage.getItem(cellarNameKey) ?? "";
+      const savedCurrency = localStorage.getItem(currencyKey) as CurrencyCode | null;
+      const accountFirstName = account?.name.split(" ")[0] ?? "";
+      const nextFirstName = savedFirstName || accountFirstName;
+      const nextCellarName = savedCellarName || (account ? `${account.name.split(" ")[0] || account.name}'s Cellar` : "My Cellar");
+      setFirstName(nextFirstName);
+      setProfileFirstName(nextFirstName);
+      setCellarName(nextCellarName);
+      setProfileCellarName(nextCellarName);
+      if (savedCurrency && savedCurrency in currencyLabels) {
+        setCurrency(savedCurrency);
+        setProfileCurrency(savedCurrency);
+      }
+    } catch {
+      setFirstName("");
+    }
+  }
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
@@ -500,37 +575,16 @@ export default function Home() {
     window.addEventListener("hashchange", handleHashChange);
     if (!window.location.hash) window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
     try {
-      localStorage.removeItem("cellar-removed-bottles");
-      localStorage.removeItem("cellar-collection-bottles");
-      const saved = JSON.parse(localStorage.getItem("cellar-collection-bottles-v2") ?? "[]");
-      if (Array.isArray(saved)) setCollectionBottles(saved);
+      const savedAccounts = JSON.parse(localStorage.getItem(accountsStorageKey) ?? "[]");
+      const normalizedAccounts = Array.isArray(savedAccounts) ? savedAccounts : [];
+      const sessionId = localStorage.getItem(sessionStorageKey);
+      const sessionAccount = normalizedAccounts.find((account: CellarAccount) => account.id === sessionId) ?? null;
+      setAccounts(normalizedAccounts);
+      setCurrentAccount(sessionAccount);
+      setAuthMode(sessionAccount ? "signin" : "create");
+      loadCellarData(sessionAccount);
     } catch {
-      setCollectionBottles([]);
-    }
-    try {
-      const savedChecks = JSON.parse(localStorage.getItem("cellar-checked-bottles-v1") ?? "[]");
-      if (Array.isArray(savedChecks)) setCheckedBottles(savedChecks);
-    } catch {
-      setCheckedBottles([]);
-    }
-    try {
-      const savedFirstName = localStorage.getItem("cellar-profile-first-name") ?? "";
-      if (savedFirstName) {
-        setFirstName(savedFirstName);
-        setProfileFirstName(savedFirstName);
-      }
-      const savedCellarName = localStorage.getItem("cellar-profile-cellar-name") ?? "";
-      if (savedCellarName) {
-        setCellarName(savedCellarName);
-        setProfileCellarName(savedCellarName);
-      }
-      const savedCurrency = localStorage.getItem("cellar-profile-currency") as CurrencyCode | null;
-      if (savedCurrency && savedCurrency in currencyLabels) {
-        setCurrency(savedCurrency);
-        setProfileCurrency(savedCurrency);
-      }
-    } catch {
-      setFirstName("");
+      loadCellarData(null);
     }
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
@@ -629,13 +683,88 @@ export default function Home() {
       setProfileStatus("Name your cellar.");
       return;
     }
-    localStorage.setItem("cellar-profile-first-name", nameValue);
-    localStorage.setItem("cellar-profile-cellar-name", cellarValue);
-    localStorage.setItem("cellar-profile-currency", profileCurrency);
+    localStorage.setItem(scopedStorageKey("cellar-profile-first-name"), nameValue);
+    localStorage.setItem(scopedStorageKey("cellar-profile-cellar-name"), cellarValue);
+    localStorage.setItem(scopedStorageKey("cellar-profile-currency"), profileCurrency);
     setFirstName(nameValue);
     setCellarName(cellarValue);
     setCurrency(profileCurrency);
     setProfileStatus("Profile saved.");
+  }
+
+  function saveAccounts(next: CellarAccount[]) {
+    setAccounts(next);
+    localStorage.setItem(accountsStorageKey, JSON.stringify(next));
+  }
+
+  function resetAuthForm() {
+    setAccountName("");
+    setAccountEmail("");
+    setAccountPassword("");
+  }
+
+  function createAccount() {
+    const name = accountName.trim();
+    const email = accountEmail.trim().toLowerCase();
+    const password = accountPassword;
+    if (!name || !email || !password) {
+      setAccountStatus("Enter a name, email, and password.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAccountStatus("Enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setAccountStatus("Use at least 6 characters for the password.");
+      return;
+    }
+    if (accounts.some((account) => account.email === email)) {
+      setAccountStatus("That email already has an account. Sign in instead.");
+      setAuthMode("signin");
+      return;
+    }
+    const nextAccount = {
+      id: `account-${Date.now()}`,
+      name,
+      email,
+      password,
+      createdAt: new Date().toISOString()
+    };
+    const nextAccounts = [...accounts, nextAccount];
+    saveAccounts(nextAccounts);
+    localStorage.setItem(sessionStorageKey, nextAccount.id);
+    setCurrentAccount(nextAccount);
+    setProfileFirstName(name.split(" ")[0] ?? name);
+    setProfileCellarName(`${name.split(" ")[0] || name}'s Cellar`);
+    localStorage.setItem(storageKeyForAccount(nextAccount, "cellar-profile-first-name"), name.split(" ")[0] ?? name);
+    localStorage.setItem(storageKeyForAccount(nextAccount, "cellar-profile-cellar-name"), `${name.split(" ")[0] || name}'s Cellar`);
+    localStorage.setItem(storageKeyForAccount(nextAccount, "cellar-profile-currency"), profileCurrency);
+    loadCellarData(nextAccount);
+    resetAuthForm();
+    setAccountStatus(`Signed in as ${name}. This account now owns the shared cellar on this device.`);
+  }
+
+  function signInAccount() {
+    const email = accountEmail.trim().toLowerCase();
+    const password = accountPassword;
+    const account = accounts.find((item) => item.email === email && item.password === password);
+    if (!account) {
+      setAccountStatus("Email or password did not match an account.");
+      return;
+    }
+    localStorage.setItem(sessionStorageKey, account.id);
+    setCurrentAccount(account);
+    loadCellarData(account);
+    resetAuthForm();
+    setAccountStatus(`Signed in to ${account.name}'s shared cellar.`);
+  }
+
+  function signOutAccount() {
+    localStorage.removeItem(sessionStorageKey);
+    setCurrentAccount(null);
+    loadCellarData(null);
+    setAccountStatus("Signed out. Sign in again to access the shared cellar.");
   }
 
   async function loadWeather(latitude: number, longitude: number, label: string) {
@@ -703,7 +832,7 @@ export default function Home() {
   function persistCollection(next: CollectionBottle[]) {
     setCollectionBottles(next);
     try {
-      localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(next));
+      localStorage.setItem(scopedStorageKey("cellar-collection-bottles-v2"), JSON.stringify(next));
     } catch {
       setCollectionBottles(next);
     }
@@ -752,7 +881,7 @@ export default function Home() {
         );
         if (next !== current && next.some((item) => item === updatedBottle)) {
           try {
-            localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(next));
+            localStorage.setItem(scopedStorageKey("cellar-collection-bottles-v2"), JSON.stringify(next));
           } catch {
             // Keep the in-memory update even if local storage is full.
           }
@@ -773,7 +902,7 @@ export default function Home() {
         ...current.filter((item) => `${item.producer}-${item.wine}-${item.vintage}` !== key)
       ].slice(0, 12);
       try {
-        localStorage.setItem("cellar-checked-bottles-v1", JSON.stringify(next));
+        localStorage.setItem(scopedStorageKey("cellar-checked-bottles-v1"), JSON.stringify(next));
       } catch {
         // Local memory is optional; keep the in-session list even if storage is unavailable.
       }
@@ -852,7 +981,7 @@ export default function Home() {
     const next = collectionBottles.filter((bottle) => `${bottle.producer}-${bottle.vintage}` !== key);
     setCollectionBottles(next);
     try {
-      localStorage.setItem("cellar-collection-bottles-v2", JSON.stringify(next));
+      localStorage.setItem(scopedStorageKey("cellar-collection-bottles-v2"), JSON.stringify(next));
     } catch {
       setCollectionBottles(next);
     }
@@ -911,11 +1040,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-cellar-cream text-cellar-ink">
-      <section className={`relative isolate min-h-screen px-4 pb-8 pt-4 sm:px-6 lg:px-8 ${activeView === "home" ? "" : "hidden"}`}>
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(199,162,90,0.12),transparent_30%),linear-gradient(180deg,#fbf7ed_0%,#f6efe1_100%)]" />
-        <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-[linear-gradient(180deg,rgba(59,12,27,0.12),transparent)]" />
-
-        <header className="relative z-50 mx-auto flex max-w-7xl items-center justify-between rounded-lg border border-white/60 bg-white/42 px-3 py-3 shadow-soft backdrop-blur-md">
+      <div className="relative z-50 px-4 pt-4 sm:px-6 lg:px-8">
+        <header className="mx-auto flex max-w-7xl items-center justify-between rounded-lg border border-white/60 bg-white/42 px-3 py-3 shadow-soft backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div>
               <p className="font-serif text-xl leading-none tracking-normal">Cellar</p>
@@ -973,6 +1099,10 @@ export default function Home() {
             </details>
           </div>
         </header>
+      </div>
+      <section className={`relative isolate min-h-screen px-4 pb-8 pt-4 sm:px-6 lg:px-8 ${activeView === "home" ? "" : "hidden"}`}>
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(199,162,90,0.12),transparent_30%),linear-gradient(180deg,#fbf7ed_0%,#f6efe1_100%)]" />
+        <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-[linear-gradient(180deg,rgba(59,12,27,0.12),transparent)]" />
 
         <div className="mx-auto grid max-w-7xl gap-6 pt-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
           <div className="grid content-start gap-6">
@@ -1682,6 +1812,103 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <p className="text-xs uppercase tracking-[0.18em] text-burgundy-700">Profile & Settings</p>
           <h2 className="mt-2 font-serif text-4xl">Your Cellar profile</h2>
+          <section className="mt-6 max-w-4xl rounded-lg border border-cellar-oak/20 bg-white/70 p-5 shadow-soft">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex gap-3">
+                <span className="grid size-11 shrink-0 place-items-center rounded-md bg-burgundy-700 text-white">
+                  <Users className="size-5" aria-hidden />
+                </span>
+                <div>
+                  <p className="font-serif text-2xl">Shared cellar account</p>
+                  <p className="mt-1 text-sm leading-6 text-cellar-walnut">
+                    Create one login for the people who share this cellar.
+                  </p>
+                </div>
+              </div>
+              {currentAccount && (
+                <button
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-cellar-oak/25 px-4 py-2 text-sm font-medium text-burgundy-700"
+                  onClick={signOutAccount}
+                  type="button"
+                >
+                  <LogOut className="size-4" aria-hidden />
+                  Sign out
+                </button>
+              )}
+            </div>
+            {currentAccount ? (
+              <div className="mt-5 grid gap-3 rounded-md bg-cellar-parchment p-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">Signed in</p>
+                  <p className="mt-1 font-medium">{currentAccount.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">Email</p>
+                  <p className="mt-1 font-medium">{currentAccount.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-cellar-walnut">Shared bottles</p>
+                  <p className="mt-1 font-medium">{collectionTotal}</p>
+                </div>
+              </div>
+            ) : (
+              <form
+                className="mt-5 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (authMode === "create") createAccount();
+                  else signInAccount();
+                }}
+              >
+                {authMode === "create" && (
+                  <input
+                    className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+                    value={accountName}
+                    onChange={(event) => setAccountName(event.target.value)}
+                    placeholder="Name"
+                    autoComplete="name"
+                    aria-label="Account name"
+                  />
+                )}
+                <input
+                  className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+                  value={accountEmail}
+                  onChange={(event) => setAccountEmail(event.target.value)}
+                  placeholder="Email"
+                  autoComplete="email"
+                  type="email"
+                  aria-label="Account email"
+                />
+                <input
+                  className="rounded-md border border-cellar-oak/25 bg-white px-4 py-3 outline-none"
+                  value={accountPassword}
+                  onChange={(event) => setAccountPassword(event.target.value)}
+                  placeholder="Password"
+                  autoComplete={authMode === "create" ? "new-password" : "current-password"}
+                  type="password"
+                  aria-label="Account password"
+                />
+                <button className="rounded-md bg-cellar-ink px-5 py-3 text-sm font-medium text-white" type="submit">
+                  {authMode === "create" ? "Create account" : "Sign in"}
+                </button>
+              </form>
+            )}
+            {!currentAccount && (
+              <button
+                className="mt-3 text-sm font-medium text-burgundy-700"
+                onClick={() => {
+                  setAuthMode((mode) => mode === "create" ? "signin" : "create");
+                  setAccountStatus("");
+                }}
+                type="button"
+              >
+                {authMode === "create" ? "Already have an account? Sign in" : "Need an account? Create one"}
+              </button>
+            )}
+            <p className="mt-3 min-h-5 text-sm text-cellar-walnut" role="status">
+              {accountStatus || (currentAccount ? "This browser is using the shared cellar account." : "Accounts are saved locally until Supabase authentication is connected.")}
+            </p>
+          </section>
           <form
             className="mt-5 grid max-w-4xl gap-2 sm:grid-cols-[1fr_1fr_170px_auto]"
             onSubmit={(event) => {

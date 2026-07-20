@@ -994,6 +994,38 @@
       }
       .profile-form button { border-radius: 6px; background: var(--burgundy); color: white; padding: 12px 16px; font-weight: 800; }
       .profile-status { min-height: 18px; color: var(--oak); font-size: 13px; }
+      .account-panel {
+        margin-top: 20px;
+        max-width: 860px;
+        border: 1px solid rgba(142,96,72,.22);
+        border-radius: 8px;
+        background: rgba(255,255,255,.7);
+        padding: 20px;
+        box-shadow: var(--soft-shadow);
+      }
+      .account-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+      .account-head h3 { margin: 0; font: 500 26px Georgia, serif; }
+      .account-head p, .account-status { color: var(--oak); line-height: 1.55; font-size: 14px; }
+      .account-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 8px; margin-top: 16px; }
+      .account-grid.sign-in { grid-template-columns: repeat(2, minmax(0, 1fr)) auto; }
+      .account-grid input {
+        border: 1px solid rgba(142,96,72,.25);
+        border-radius: 6px;
+        background: white;
+        color: var(--ink);
+        padding: 12px;
+        font: inherit;
+      }
+      .account-grid button, .account-toggle, .account-signout {
+        border-radius: 6px;
+        background: var(--ink);
+        color: white;
+        padding: 12px 16px;
+        font-weight: 800;
+      }
+      .account-toggle, .account-signout { margin-top: 12px; background: transparent; color: var(--burgundy); border: 1px solid rgba(142,96,72,.28); }
+      .account-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; border-radius: 6px; background: var(--cream); padding: 14px; }
+      .account-card span { display: block; margin-bottom: 6px; color: var(--oak); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
       .shelves {
         position: absolute;
         top: 122px;
@@ -1043,7 +1075,7 @@
         .recognition, .capture-grid { grid-template-columns: 1fr; }
         .overview-head { align-items: start; flex-direction: column; }
         .collection-tools, .collection-grid, .wine-shelf-grid, .premium-card-main { grid-template-columns: 1fr; }
-        .profile-form { grid-template-columns: 1fr; }
+        .profile-form, .account-grid, .account-grid.sign-in, .account-card { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -1289,6 +1321,24 @@
       <section class="profile-settings" id="settings">
         <p class="eyebrow">Profile & Settings</p>
         <h2>Your Cellar profile</h2>
+        <section class="account-panel" aria-label="Shared cellar account">
+          <div class="account-head">
+            <div>
+              <h3>Shared cellar account</h3>
+              <p>Create one login for the people who share this cellar.</p>
+            </div>
+            <button class="account-signout" id="account-signout" type="button" hidden>Sign out</button>
+          </div>
+          <div id="account-card" class="account-card" hidden></div>
+          <form class="account-grid" id="account-form">
+            <input id="account-name" type="text" placeholder="Name" autocomplete="name" aria-label="Account name" />
+            <input id="account-email" type="email" placeholder="Email" autocomplete="email" aria-label="Account email" />
+            <input id="account-password" type="password" placeholder="Password" autocomplete="new-password" aria-label="Account password" />
+            <button id="account-submit" type="submit">Create account</button>
+          </form>
+          <button class="account-toggle" id="account-toggle" type="button">Already have an account? Sign in</button>
+          <p class="account-status" id="account-status" role="status">Accounts are saved locally in this preview.</p>
+        </section>
         <form class="profile-form" id="profile-form">
           <input id="profile-first-name" type="text" placeholder="First name" autocomplete="given-name" aria-label="First name" />
           <input id="profile-cellar-name" type="text" placeholder="Cellar name" aria-label="Cellar name" />
@@ -2126,6 +2176,92 @@
       const welcomeHeading = document.getElementById("welcome-heading");
       const heroCellarName = document.getElementById("hero-cellar-name");
       const overviewCellarName = document.getElementById("overview-cellar-name");
+      const accountForm = document.getElementById("account-form");
+      const accountName = document.getElementById("account-name");
+      const accountEmail = document.getElementById("account-email");
+      const accountPassword = document.getElementById("account-password");
+      const accountSubmit = document.getElementById("account-submit");
+      const accountToggle = document.getElementById("account-toggle");
+      const accountStatus = document.getElementById("account-status");
+      const accountCard = document.getElementById("account-card");
+      const accountSignout = document.getElementById("account-signout");
+      const accountsStorageKey = "cellar-shared-accounts-v1";
+      const sessionStorageKey = "cellar-active-account-v1";
+      let accountMode = "create";
+      let previewAccounts = JSON.parse(localStorage.getItem(accountsStorageKey) || "[]");
+      let currentAccount = previewAccounts.find((account) => account.id === localStorage.getItem(sessionStorageKey)) || null;
+      function savePreviewAccounts() {
+        localStorage.setItem(accountsStorageKey, JSON.stringify(previewAccounts));
+      }
+      function renderAccountPanel(message = "") {
+        accountCard.hidden = !currentAccount;
+        accountSignout.hidden = !currentAccount;
+        accountForm.hidden = Boolean(currentAccount);
+        accountToggle.hidden = Boolean(currentAccount);
+        if (currentAccount) {
+          accountCard.innerHTML = `
+            <div><span>Signed in</span>${currentAccount.name}</div>
+            <div><span>Email</span>${currentAccount.email}</div>
+            <div><span>Shared bottles</span>${collectionBottles.reduce((total, wine) => total + Number.parseInt(wine.quantity, 10), 0)}</div>
+          `;
+        }
+        accountName.hidden = accountMode === "signin";
+        accountName.required = accountMode === "create";
+        accountForm.classList.toggle("sign-in", accountMode === "signin");
+        accountSubmit.textContent = accountMode === "create" ? "Create account" : "Sign in";
+        accountToggle.textContent = accountMode === "create" ? "Already have an account? Sign in" : "Need an account? Create one";
+        accountPassword.autocomplete = accountMode === "create" ? "new-password" : "current-password";
+        accountStatus.textContent = message || (currentAccount ? "This preview is using the shared cellar account." : "Accounts are saved locally in this preview.");
+      }
+      accountForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const email = accountEmail.value.trim().toLowerCase();
+        const password = accountPassword.value;
+        if (accountMode === "create") {
+          const name = accountName.value.trim();
+          if (!name || !email || !password) {
+            renderAccountPanel("Enter a name, email, and password.");
+            return;
+          }
+          if (password.length < 6) {
+            renderAccountPanel("Use at least 6 characters for the password.");
+            return;
+          }
+          if (previewAccounts.some((account) => account.email === email)) {
+            accountMode = "signin";
+            renderAccountPanel("That email already has an account. Sign in instead.");
+            return;
+          }
+          currentAccount = { id: `account-${Date.now()}`, name, email, password, createdAt: new Date().toISOString() };
+          previewAccounts = [...previewAccounts, currentAccount];
+          savePreviewAccounts();
+          localStorage.setItem(sessionStorageKey, currentAccount.id);
+          applyFirstName(name.split(" ")[0] || name);
+          applyCellarName(`${name.split(" ")[0] || name}'s Cellar`);
+          profileStatus.textContent = "Profile updated from shared account.";
+          accountForm.reset();
+          renderAccountPanel(`Signed in as ${name}.`);
+          return;
+        }
+        const match = previewAccounts.find((account) => account.email === email && account.password === password);
+        if (!match) {
+          renderAccountPanel("Email or password did not match an account.");
+          return;
+        }
+        currentAccount = match;
+        localStorage.setItem(sessionStorageKey, match.id);
+        accountForm.reset();
+        renderAccountPanel(`Signed in to ${match.name}'s shared cellar.`);
+      });
+      accountToggle.addEventListener("click", () => {
+        accountMode = accountMode === "create" ? "signin" : "create";
+        renderAccountPanel();
+      });
+      accountSignout.addEventListener("click", () => {
+        localStorage.removeItem(sessionStorageKey);
+        currentAccount = null;
+        renderAccountPanel("Signed out. Sign in again to access the shared cellar.");
+      });
       let activeCellarName = localStorage.getItem("cellar-profile-cellar-name") || "My Cellar";
       function applyCellarName(name) {
         activeCellarName = name;
@@ -2150,6 +2286,7 @@
       if (["GBP", "USD", "EUR"].includes(activeCurrency)) profileCurrency.value = activeCurrency;
       applyFirstName(savedFirstName);
       applyCellarName(activeCellarName);
+      renderAccountPanel();
       void loadExchangeRates();
       profileForm.addEventListener("submit", (event) => {
         event.preventDefault();
