@@ -620,6 +620,29 @@ export default function Home() {
     return bottles;
   }
 
+  function findLocalBottlesForMigration() {
+    const bottleMap = new Map<string, CollectionBottle>();
+    const candidateKeys = [
+      "cellar-collection-bottles-v2",
+      ...Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index) ?? "")
+        .filter((key) => key.includes("cellar-collection-bottles-v2"))
+    ];
+    for (const key of new Set(candidateKeys)) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(key) ?? "[]");
+        if (!Array.isArray(saved)) continue;
+        for (const bottle of saved) {
+          if (!bottle?.producer || !bottle?.wine || !bottle?.vintage) continue;
+          const migrationKey = `${bottle.producer}-${bottle.wine}-${bottle.vintage}`;
+          bottleMap.set(migrationKey, { ...bottle, cloudId: undefined });
+        }
+      } catch {
+        // Ignore old or malformed local storage buckets.
+      }
+    }
+    return Array.from(bottleMap.values());
+  }
+
   async function syncCloudBottles(next: CollectionBottle[], account = currentAccount, session = supabaseSession) {
     if (!account?.cellarId || !session) return;
     await supabaseRequest(
@@ -963,7 +986,7 @@ export default function Home() {
         setCurrentAccount(cloudAccount);
         localStorage.setItem(supabaseSessionStorageKey, JSON.stringify(session));
         localStorage.setItem(sessionStorageKey, cloudAccount.id);
-        const localBottlesToMigrate = collectionBottles.filter((bottle) => !bottle.cloudId);
+        const localBottlesToMigrate = findLocalBottlesForMigration();
         loadCellarData(cloudAccount);
         const cloudBottles = await loadCloudBottles(session, cloudAccount);
         if (!cloudBottles.length && localBottlesToMigrate.length) {
