@@ -560,6 +560,21 @@ export default function Home() {
     return response.json() as Promise<T>;
   }
 
+  function readableSupabaseError(error: unknown) {
+    if (!(error instanceof Error)) return "Supabase returned an unknown error.";
+    try {
+      const parsed = JSON.parse(error.message) as {
+        msg?: string;
+        message?: string;
+        error?: string;
+        error_description?: string;
+      };
+      return parsed.msg ?? parsed.message ?? parsed.error_description ?? parsed.error ?? error.message;
+    } catch {
+      return error.message;
+    }
+  }
+
   async function ensureCloudCellar(session: SupabaseSession, displayName: string) {
     const existingMemberships = await supabaseRequest<Array<{ cellar_id: string }>>(
       `/rest/v1/cellar_members?select=cellar_id&user_id=eq.${session.user.id}&limit=1`,
@@ -593,7 +608,7 @@ export default function Home() {
   }
 
   async function loadCloudBottles(session: SupabaseSession, account: CellarAccount) {
-    if (!account.cellarId) return;
+    if (!account.cellarId) return [];
     const rows = await supabaseRequest<CloudBottleRow[]>(
       `/rest/v1/bottles?select=id,cellar_id,data&cellar_id=eq.${account.cellarId}&order=created_at.desc`,
       {},
@@ -602,6 +617,7 @@ export default function Home() {
     const bottles = rows.map((row) => ({ ...row.data, cloudId: row.id, cellar: row.data.cellar || cellarName }));
     setCollectionBottles(bottles);
     localStorage.setItem(storageKeyForAccount(account, "cellar-collection-bottles-v2"), JSON.stringify(bottles));
+    return bottles;
   }
 
   async function syncCloudBottles(next: CollectionBottle[], account = currentAccount, session = supabaseSession) {
@@ -893,7 +909,7 @@ export default function Home() {
         setAccountStatus(`Signed in as ${name}. Your shared cellar is now cloud-backed.`);
       } catch (error) {
         console.error("Supabase sign up failed:", error);
-        setAccountStatus("Could not create the cloud account. Check Supabase Auth settings and table policies.");
+        setAccountStatus(`Could not create the cloud account: ${readableSupabaseError(error)}`);
       }
       return;
     }
@@ -947,13 +963,19 @@ export default function Home() {
         setCurrentAccount(cloudAccount);
         localStorage.setItem(supabaseSessionStorageKey, JSON.stringify(session));
         localStorage.setItem(sessionStorageKey, cloudAccount.id);
+        const localBottlesToMigrate = collectionBottles.filter((bottle) => !bottle.cloudId);
         loadCellarData(cloudAccount);
-        await loadCloudBottles(session, cloudAccount);
+        const cloudBottles = await loadCloudBottles(session, cloudAccount);
+        if (!cloudBottles.length && localBottlesToMigrate.length) {
+          await syncCloudBottles(localBottlesToMigrate, cloudAccount, session);
+          setAccountStatus(`Signed in to ${cloudAccount.name}'s shared cellar. Migrated ${localBottlesToMigrate.length} local bottle${localBottlesToMigrate.length === 1 ? "" : "s"} to Supabase.`);
+        } else {
+          setAccountStatus(`Signed in to ${cloudAccount.name}'s shared cellar.`);
+        }
         resetAuthForm();
-        setAccountStatus(`Signed in to ${cloudAccount.name}'s shared cellar.`);
       } catch (error) {
         console.error("Supabase sign in failed:", error);
-        setAccountStatus("Email or password did not match a Supabase account.");
+        setAccountStatus(`Could not sign in: ${readableSupabaseError(error)}`);
       }
       return;
     }
